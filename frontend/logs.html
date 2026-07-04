@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sekuvo Admin — Activity Logs</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #fff;
+      min-height: 100vh;
+    }
+
+    /* Navbar */
+    .navbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 2rem;
+      background: #1a1a1a;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .logo { font-size: 22px; font-weight: 700; }
+    .logo span { color: #6c63ff; }
+    .nav-right { display: flex; align-items: center; gap: 1rem; }
+    .nav-link {
+      padding: 6px 16px;
+      border-radius: 8px;
+      border: 1px solid #2a2a2a;
+      background: transparent;
+      color: #888;
+      font-size: 13px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .nav-link:hover { background: #2a2a2a; color: #fff; }
+    .nav-link.active { border-color: #6c63ff44; color: #6c63ff; background: #6c63ff11; }
+    .logout-btn {
+      padding: 6px 16px;
+      border-radius: 8px;
+      border: 1px solid #ff6b6b44;
+      background: #2a1a1a;
+      color: #ff6b6b;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .logout-btn:hover { background: #ff6b6b22; }
+
+    /* Main */
+    .main { padding: 2rem; max-width: 1100px; margin: 0 auto; }
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2rem;
+    }
+    .page-title { font-size: 24px; font-weight: 600; }
+    .page-sub { font-size: 13px; color: #555; margin-top: 0.3rem; }
+
+    .refresh-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 18px;
+      border-radius: 8px;
+      border: 1px solid #6c63ff44;
+      background: #6c63ff11;
+      color: #6c63ff;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .refresh-btn:hover { background: #6c63ff22; }
+
+    /* Filter bar */
+    .filter-bar {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    .filter-btn {
+      padding: 6px 16px;
+      border-radius: 20px;
+      border: 1px solid #2a2a2a;
+      background: transparent;
+      color: #666;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .filter-btn:hover { border-color: #6c63ff; color: #6c63ff; }
+    .filter-btn.active { border-color: #6c63ff; background: #6c63ff22; color: #6c63ff; }
+
+    /* Logs table */
+    .logs-card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .logs-header {
+      display: grid;
+      grid-template-columns: 60px 100px 1fr 160px 180px;
+      padding: 0.85rem 1.25rem;
+      background: #111;
+      border-bottom: 1px solid #2a2a2a;
+      font-size: 11px;
+      color: #444;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .log-row {
+      display: grid;
+      grid-template-columns: 60px 100px 1fr 160px 180px;
+      padding: 0.9rem 1.25rem;
+      border-bottom: 1px solid #1f1f1f;
+      font-size: 13px;
+      align-items: center;
+      transition: background 0.15s;
+    }
+    .log-row:last-child { border-bottom: none; }
+    .log-row:hover { background: #ffffff05; }
+
+    .log-id { color: #333; font-size: 12px; }
+    .log-type {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 500;
+      width: fit-content;
+    }
+    .type-success { background: #1a2a1a; color: #6bcb77; border: 1px solid #6bcb7722; }
+    .type-error { background: #2a1a1a; color: #ff6b6b; border: 1px solid #ff6b6b22; }
+    .type-info { background: #1a1a2a; color: #6c63ff; border: 1px solid #6c63ff22; }
+    .type-warning { background: #2a2a1a; color: #ffd93d; border: 1px solid #ffd93d22; }
+
+    .log-message { color: #ccc; }
+    .log-device { color: #555; font-size: 12px; }
+    .log-time { color: #444; font-size: 12px; }
+
+    .empty-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: #333;
+    }
+    .empty-state div { font-size: 48px; margin-bottom: 1rem; }
+
+    .total-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      background: #1a1a2a;
+      color: #6c63ff;
+      border: 1px solid #6c63ff22;
+      border-radius: 20px;
+      font-size: 12px;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="logo">Seku<span>vo</span> <span style="font-size:14px;color:#444;font-weight:400;">Admin</span></div>
+    <div class="nav-right">
+      <a href="admin.html" class="nav-link">Dashboard</a>
+      <a href="logs.html" class="nav-link active">Activity Logs</a>
+      <button class="logout-btn" onclick="logout()">⏏ Remove USB</button>
+    </div>
+  </nav>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Activity Logs</div>
+        <div class="page-sub">Complete history of all authentication events — entries cannot be deleted.</div>
+      </div>
+      <button class="refresh-btn" onclick="loadLogs()">↻ Refresh</button>
+    </div>
+
+    <div class="filter-bar">
+      <button class="filter-btn active" onclick="filterLogs('all', this)">All</button>
+      <button class="filter-btn" onclick="filterLogs('success', this)">Success</button>
+      <button class="filter-btn" onclick="filterLogs('error', this)">Failed</button>
+      <button class="filter-btn" onclick="filterLogs('info', this)">Info</button>
+    </div>
+
+    <div class="total-badge">
+      <span>📋</span>
+      <span id="totalCount">Loading...</span>
+    </div>
+
+    <div class="logs-card">
+      <div class="logs-header">
+        <div>#</div>
+        <div>Type</div>
+        <div>Message</div>
+        <div>Device</div>
+        <div>Timestamp</div>
+      </div>
+      <div id="logsContainer">
+        <div class="empty-state">
+          <div>⏳</div>
+          Loading logs...
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const token = localStorage.getItem('adminToken');
+    if (!token) window.location.href = 'index.html';
+
+    let allLogs = [];
+    let currentFilter = 'all';
+
+    async function loadLogs() {
+      try {
+        const res = await fetch('http://localhost:3000/api/admin/logs', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        allLogs = data.logs;
+        renderLogs(allLogs);
+      } catch (err) {
+        document.getElementById('logsContainer').innerHTML = `
+          <div class="empty-state">
+            <div>❌</div>
+            Failed to load logs. Server running?
+          </div>`;
+      }
+    }
+
+    function renderLogs(logs) {
+      const container = document.getElementById('logsContainer');
+      document.getElementById('totalCount').textContent = `${logs.length} entries`;
+
+      if (logs.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div>📭</div>
+            No activity logs found.
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = logs.map(log => `
+        <div class="log-row">
+          <div class="log-id">#${log.id}</div>
+          <div><span class="log-type ${getTypeClass(log.type)}">${getTypeIcon(log.type)} ${log.type}</span></div>
+          <div class="log-message">${log.message}</div>
+          <div class="log-device">${log.device || '—'}</div>
+          <div class="log-time">${formatDate(log.created_at)}</div>
+        </div>
+      `).join('');
+    }
+
+    function filterLogs(type, btn) {
+      currentFilter = type;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      if (type === 'all') {
+        renderLogs(allLogs);
+      } else {
+        renderLogs(allLogs.filter(log => log.type === type));
+      }
+    }
+
+    function getTypeClass(type) {
+      const map = { success: 'type-success', error: 'type-error', info: 'type-info', warning: 'type-warning' };
+      return map[type] || 'type-info';
+    }
+
+    function getTypeIcon(type) {
+      const map = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+      return map[type] || 'ℹ️';
+    }
+
+    function formatDate(dateStr) {
+      const d = new Date(dateStr);
+      return d.toLocaleString('en-IN', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+
+    function logout() {
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('deviceName');
+      window.location.href = 'index.html';
+    }
+
+    loadLogs();
+  </script>
+
+</body>
+</html>

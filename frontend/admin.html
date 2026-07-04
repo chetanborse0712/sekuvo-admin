@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sekuvo Admin — Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #fff;
+      min-height: 100vh;
+    }
+
+    /* Navbar */
+    .navbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 2rem;
+      background: #1a1a1a;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .logo { font-size: 22px; font-weight: 700; }
+    .logo span { color: #6c63ff; }
+    .nav-right { display: flex; align-items: center; gap: 1rem; }
+    .usb-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      background: #1a2a1a;
+      color: #6bcb77;
+      border: 1px solid #6bcb7744;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .blink {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #6bcb77;
+      animation: blink 1.5s ease-in-out infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+    .logout-btn {
+      padding: 6px 16px;
+      border-radius: 8px;
+      border: 1px solid #ff6b6b44;
+      background: #2a1a1a;
+      color: #ff6b6b;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .logout-btn:hover { background: #ff6b6b22; }
+
+    /* Main */
+    .main { padding: 2rem; max-width: 1100px; margin: 0 auto; }
+    .page-title { font-size: 24px; font-weight: 600; margin-bottom: 0.3rem; }
+    .page-sub { font-size: 13px; color: #555; margin-bottom: 2rem; }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+    }
+    .stat-label { font-size: 12px; color: #555; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-value { font-size: 32px; font-weight: 600; }
+    .stat-value.purple { color: #6c63ff; }
+    .stat-value.green { color: #6bcb77; }
+    .stat-value.red { color: #ff6b6b; }
+
+    /* Sections */
+    .sections-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    .section-card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+    }
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 1rem;
+    }
+
+    /* Users */
+    .user-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid #222;
+    }
+    .user-row:last-child { border-bottom: none; }
+    .avatar {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: #6c63ff22;
+      color: #6c63ff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 600;
+    }
+    .user-name { font-size: 14px; flex: 1; }
+    .user-role { font-size: 11px; color: #555; }
+    .online { width: 7px; height: 7px; border-radius: 50%; background: #6bcb77; }
+    .offline { width: 7px; height: 7px; border-radius: 50%; background: #333; }
+
+    /* Activity */
+    .activity-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid #222;
+      font-size: 13px;
+    }
+    .activity-row:last-child { border-bottom: none; }
+    .activity-icon { font-size: 16px; }
+    .activity-text { flex: 1; color: #ccc; }
+    .activity-time { font-size: 11px; color: #444; white-space: nowrap; }
+
+    .device-info {
+      font-size: 12px;
+      color: #444;
+      margin-top: 0.3rem;
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="logo">Seku<span>vo</span> <span style="font-size:14px;color:#444;font-weight:400;">Admin</span></div>
+    <div class="nav-right">
+      <div class="usb-badge">
+        <div class="blink"></div>
+        <span id="usbDeviceName">USB Active</span>
+      </div>
+      <button class="logout-btn" onclick="removeUSB()">⏏ Remove USB</button>
+    </div>
+  </nav>
+
+  <main class="main">
+    <div class="page-title">Dashboard</div>
+    <p class="page-sub">Welcome back. Your session is secured via USB authentication.</p>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Users</div>
+        <div class="stat-value purple" id="statUsers">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Active Sessions</div>
+        <div class="stat-value green" id="statSessions">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Security Alerts</div>
+        <div class="stat-value red" id="statAlerts">—</div>
+      </div>
+    </div>
+
+    <div class="sections-grid">
+      <div class="section-card">
+        <div class="section-title">Online Users</div>
+        <div class="user-row">
+          <div class="avatar">RS</div>
+          <div style="flex:1">
+            <div class="user-name">Rahul Sharma</div>
+            <div class="user-role">Super Admin</div>
+          </div>
+          <div class="online" title="Online"></div>
+        </div>
+        <div class="user-row">
+          <div class="avatar">PK</div>
+          <div style="flex:1">
+            <div class="user-name">Priya Kapoor</div>
+            <div class="user-role">Editor</div>
+          </div>
+          <div class="online" title="Online"></div>
+        </div>
+        <div class="user-row">
+          <div class="avatar">AV</div>
+          <div style="flex:1">
+            <div class="user-name">Aman Verma</div>
+            <div class="user-role">Viewer</div>
+          </div>
+          <div class="offline" title="Offline"></div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-title">Recent Activity</div>
+        <div class="activity-row">
+          <div class="activity-icon">🔐</div>
+          <div class="activity-text">USB authentication successful</div>
+          <div class="activity-time">Just now</div>
+        </div>
+        <div class="activity-row">
+          <div class="activity-icon">📝</div>
+          <div class="activity-text">New post published</div>
+          <div class="activity-time">2 min ago</div>
+        </div>
+        <div class="activity-row">
+          <div class="activity-icon">⚠️</div>
+          <div class="activity-text" style="color:#ff6b6b;">Failed login attempt detected</div>
+          <div class="activity-time">5 min ago</div>
+        </div>
+        <div class="activity-row">
+          <div class="activity-icon">👤</div>
+          <div class="activity-text">New user registered</div>
+          <div class="activity-time">1 hr ago</div>
+        </div>
+      </div>
+    </div>
+
+    <p class="device-info" id="deviceInfo"></p>
+  </main>
+
+  <script>
+   const token = sessionStorage.getItem('adminToken') || new URLSearchParams(window.location.search).get('token');
+const deviceName = sessionStorage.getItem('deviceName');
+
+if (!token) window.location.href = 'http://localhost:3000';
+
+// Token sessionStorage mein save karo
+if (token) sessionStorage.setItem('adminToken', token);
+
+    // Device name show karo
+    if (deviceName) {
+      document.getElementById('usbDeviceName').textContent = deviceName;
+      document.getElementById('deviceInfo').textContent = `Authenticated via: ${deviceName}`;
+    }
+
+    // Stats load karo
+    fetch('http://localhost:3000/api/admin/stats', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(res => res.json())
+    .then(data => {
+      document.getElementById('statUsers').textContent = data.users;
+      document.getElementById('statSessions').textContent = data.sessions;
+      document.getElementById('statAlerts').textContent = data.alerts;
+    })
+    .catch(() => {
+      window.location.href = 'index.html';
+    });
+
+    function removeUSB() {
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('deviceName');
+      window.location.href = 'index.html';
+    }
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sekuvo Admin — USB Authentication</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #fff;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      text-align: center;
+      padding: 3rem;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      width: 380px;
+    }
+    .logo { font-size: 28px; font-weight: 700; color: #fff; margin-bottom: 0.3rem; }
+    .logo span { color: #6c63ff; }
+    .subtitle { font-size: 13px; color: #666; margin-bottom: 2.5rem; }
+    .usb-icon { font-size: 64px; margin-bottom: 1.5rem; display: block; transition: all 0.3s; }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 1.5rem;
+    }
+    .locked { background: #2a1a1a; color: #ff6b6b; border: 1px solid #ff6b6b44; }
+    .verifying { background: #2a2a1a; color: #ffd93d; border: 1px solid #ffd93d44; }
+    .success { background: #1a2a1a; color: #6bcb77; border: 1px solid #6bcb7744; }
+    .error { background: #2a1a1a; color: #ff6b6b; border: 1px solid #ff6b6b44; }
+    .lock-title { font-size: 20px; font-weight: 600; margin-bottom: 0.4rem; }
+    .lock-sub { font-size: 13px; color: #555; margin-bottom: 2rem; line-height: 1.6; }
+    .progress-wrap {
+      width: 100%;
+      height: 3px;
+      background: #2a2a2a;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+      display: none;
+    }
+    .progress-wrap.show { display: block; }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: #6c63ff;
+      border-radius: 4px;
+      transition: width 0.05s linear;
+    }
+    .usb-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 28px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid #6c63ff;
+      background: transparent;
+      color: #6c63ff;
+      transition: all 0.2s;
+      width: 100%;
+      justify-content: center;
+    }
+    .usb-btn:hover { background: #6c63ff22; }
+    .usb-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .usb-info { font-size: 12px; color: #444; margin-top: 1rem; }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">Seku<span>vo</span></div>
+    <div class="subtitle">Admin Portal</div>
+
+    <span class="usb-icon" id="usbIcon">🔌</span>
+
+    <div class="status-badge locked" id="statusBadge">
+      <span class="dot"></span>
+      <span id="statusText">Access Locked</span>
+    </div>
+
+    <p class="lock-title">USB Authentication Required</p>
+    <p class="lock-sub">Please insert your authenticated USB device<br>to access the admin portal.</p>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+
+   <button class="usb-btn" id="usbBtn">
+      🔑 Connect USB Device
+    </button>
+
+    <p class="usb-info" id="usbInfo">No USB device detected</p>
+  </div>
+
+  <script src="usb-auth.js"></script>
+</body>
+</html>
