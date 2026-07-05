@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const os = require('os');
 const bcrypt = require('bcryptjs');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 app.use(cors());
@@ -14,15 +15,14 @@ app.use(express.static(path.join(__dirname, '../frontend')));
 const SECRET = process.env.SECRET || 'sekuvo_secret_key_2024';
 const SECRET_MASTER = process.env.SECRET_MASTER || 'SEKUVO_MASTER_SECRET_2024';
 const ALLOWED_MACHINE = process.env.ALLOWED_MACHINE || 'LAPTOP-2JQ20K53';
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
-// Recovery code store (in memory — production mein database use karo)
 let recoveryCodeHash = null;
 let recoveryCodeUsed = false;
 
-// Recovery code generate karo — server start hone pe
 async function generateRecoveryCode() {
   const code = crypto.randomBytes(12).toString('hex').toUpperCase();
-  const formatted = code.match(/.{1,6}/g).join('-'); // Format: XXXXXX-XXXXXX-XXXXXX-XXXXXX
+  const formatted = code.match(/.{1,6}/g).join('-');
   recoveryCodeHash = await bcrypt.hash(formatted, 10);
   recoveryCodeUsed = false;
   console.log('=================================');
@@ -35,8 +35,6 @@ async function generateRecoveryCode() {
 
 generateRecoveryCode();
 
-// USB verify
-const rateLimit = require('express-rate-limit');
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 3,
@@ -47,16 +45,21 @@ const authLimiter = rateLimit({
 app.post('/api/verify-key', authLimiter, (req, res) => {
   const { key, deviceId, machine, expiresAt } = req.body;
 
-  const currentMachine = os.hostname();
-  if (currentMachine !== ALLOWED_MACHINE) {
-    return res.status(401).json({ success: false, message: 'Unauthorized machine!' });
+  // Machine check — sirf local mein, production mein nahi
+  if (!IS_PRODUCTION) {
+    const currentMachine = os.hostname();
+    if (currentMachine !== ALLOWED_MACHINE) {
+      return res.status(401).json({ success: false, message: 'Unauthorized machine!' });
+    }
   }
 
+  // Expiry check
   const expiry = new Date(expiresAt);
   if (expiry < new Date()) {
     return res.status(401).json({ success: false, message: 'USB key has expired!' });
   }
 
+  // Key verify
   const expectedKey = crypto
     .createHmac('sha256', SECRET_MASTER)
     .update(machine + '_SEKUVO_ADMIN')
@@ -66,6 +69,7 @@ app.post('/api/verify-key', authLimiter, (req, res) => {
     return res.status(401).json({ success: false, message: 'Invalid USB key!' });
   }
 
+  // DeviceId check
   const expectedDeviceId = 'SEKUVO_' + machine.toUpperCase();
   if (deviceId !== expectedDeviceId) {
     return res.status(401).json({ success: false, message: 'Invalid device ID!' });
@@ -93,17 +97,14 @@ app.post('/api/verify-recovery', authLimiter, async (req, res) => {
     return res.status(401).json({ success: false, message: 'Invalid recovery code!' });
   }
 
-  // Code use ho gaya — expire karo
   recoveryCodeUsed = true;
-
-  // Naya code generate karo
   const newCode = await generateRecoveryCode();
 
   const token = jwt.sign({ machine: 'RECOVERY', deviceId: 'RECOVERY_ACCESS' }, SECRET, { expiresIn: '15m' });
 
-  res.json({ 
-    success: true, 
-    token, 
+  res.json({
+    success: true,
+    token,
     deviceName: 'Recovery Access',
     newCode: newCode,
     message: 'Access granted! New recovery code generated — save it!'
@@ -126,6 +127,7 @@ function verifyToken(req, res, next) {
   }
 }
 
-app.listen(3000, () => {
-  console.log('✅ Sekuvo Admin Server running: http://localhost:3000');
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`✅ Sekuvo Admin Server running on port ${PORT}`);
 });
