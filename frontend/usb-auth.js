@@ -1,4 +1,4 @@
-const SERVER = 'http://localhost:3000';
+const SERVER = 'https://sekuvo-admin.onrender.com';
 
 document.getElementById('usbBtn').onclick = async function() {
   try {
