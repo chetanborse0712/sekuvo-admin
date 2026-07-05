@@ -8,6 +8,7 @@ const path = require('path');
 const rateLimit = require('express-rate-limit');
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../frontend')));
@@ -45,7 +46,6 @@ const authLimiter = rateLimit({
 app.post('/api/verify-key', authLimiter, (req, res) => {
   const { key, deviceId, machine, expiresAt } = req.body;
 
-  // Machine check — sirf local mein, production mein nahi
   if (!IS_PRODUCTION) {
     const currentMachine = os.hostname();
     if (currentMachine !== ALLOWED_MACHINE) {
@@ -53,13 +53,11 @@ app.post('/api/verify-key', authLimiter, (req, res) => {
     }
   }
 
-  // Expiry check
   const expiry = new Date(expiresAt);
   if (expiry < new Date()) {
     return res.status(401).json({ success: false, message: 'USB key has expired!' });
   }
 
-  // Key verify
   const expectedKey = crypto
     .createHmac('sha256', SECRET_MASTER)
     .update(machine + '_SEKUVO_ADMIN')
@@ -69,7 +67,6 @@ app.post('/api/verify-key', authLimiter, (req, res) => {
     return res.status(401).json({ success: false, message: 'Invalid USB key!' });
   }
 
-  // DeviceId check
   const expectedDeviceId = 'SEKUVO_' + machine.toUpperCase();
   if (deviceId !== expectedDeviceId) {
     return res.status(401).json({ success: false, message: 'Invalid device ID!' });
@@ -79,7 +76,6 @@ app.post('/api/verify-key', authLimiter, (req, res) => {
   res.json({ success: true, token, deviceName: deviceId });
 });
 
-// Recovery code verify
 app.post('/api/verify-recovery', authLimiter, async (req, res) => {
   const { code } = req.body;
 
@@ -111,7 +107,6 @@ app.post('/api/verify-recovery', authLimiter, async (req, res) => {
   });
 });
 
-// Admin stats
 app.get('/api/admin/stats', verifyToken, (req, res) => {
   res.json({ users: 128, sessions: 7, alerts: 3, deviceName: req.user.deviceId });
 });
