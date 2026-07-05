@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sekuvo Admin — Recovery Access</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #fff;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      text-align: center;
+      padding: 3rem;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      width: 400px;
+    }
+    .logo { font-size: 28px; font-weight: 700; color: #fff; margin-bottom: 0.3rem; }
+    .logo span { color: #6c63ff; }
+    .subtitle { font-size: 13px; color: #666; margin-bottom: 2rem; }
+    .warning-icon { font-size: 48px; margin-bottom: 1rem; display: block; }
+    .title { font-size: 20px; font-weight: 600; margin-bottom: 0.4rem; }
+    .sub { font-size: 13px; color: #555; margin-bottom: 2rem; line-height: 1.6; }
+    .input-wrap { margin-bottom: 1rem; }
+    input {
+      width: 100%;
+      padding: 12px 16px;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 16px;
+      letter-spacing: 2px;
+      text-align: center;
+      outline: none;
+      transition: border 0.2s;
+    }
+    input:focus { border-color: #6c63ff; }
+    .recover-btn {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      background: #6c63ff;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 1rem;
+    }
+    .recover-btn:hover { background: #5a52e0; }
+    .recover-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .back-btn {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #2a2a2a;
+      background: transparent;
+      color: #666;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+      display: block;
+    }
+    .back-btn:hover { border-color: #6c63ff; color: #6c63ff; }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 1.5rem;
+    }
+    .error { background: #2a1a1a; color: #ff6b6b; border: 1px solid #ff6b6b44; }
+    .success { background: #1a2a1a; color: #6bcb77; border: 1px solid #6bcb7744; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">Seku<span>vo</span></div>
+    <div class="subtitle">Emergency Recovery Access</div>
+
+    <span class="warning-icon">🔑</span>
+
+    <div id="statusBadge" style="display:none;" class="status-badge"></div>
+
+    <p class="title">Lost Your USB?</p>
+    <p class="sub">Enter your 24-character master recovery code to gain emergency access. This code can only be used once.</p>
+
+    <div class="input-wrap">
+      <input type="text" id="recoveryCode" placeholder="XXXXXX-XXXXXX-XXXXXX-XXXXXX" maxlength="27">
+    </div>
+
+    <button class="recover-btn" id="recoverBtn" onclick="verifyRecovery()">
+      🔓 Verify Recovery Code
+    </button>
+
+    <a href="http://127.0.0.1:5500/frontend/index.html" class="back-btn">
+      ← Back to USB Login
+    </a>
+  </div>
+
+  <script>
+    const SERVER = 'http://localhost:3000';
+
+    async function verifyRecovery() {
+      const code = document.getElementById('recoveryCode').value.trim();
+      const btn = document.getElementById('recoverBtn');
+
+      if (!code) {
+        showStatus('error', 'Please enter recovery code!');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Verifying...';
+
+      try {
+        const response = await fetch(SERVER + '/api/verify-recovery', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          sessionStorage.setItem('adminToken', data.token);
+          sessionStorage.setItem('deviceName', data.deviceName);
+          // New code admin panel mein dikhega — not here!
+          sessionStorage.setItem('newRecoveryCode', data.newCode);
+
+          showStatus('success', 'Access Granted! Redirecting...');
+
+          setTimeout(() => {
+            window.location.href = 'http://127.0.0.1:5500/frontend/admin.html';
+          }, 1500);
+
+        } else {
+          showStatus('error', data.message);
+          btn.disabled = false;
+          btn.textContent = '🔓 Verify Recovery Code';
+        }
+
+      } catch(e) {
+        showStatus('error', 'Server error: ' + e.message);
+        btn.disabled = false;
+        btn.textContent = '🔓 Verify Recovery Code';
+      }
+    }
+
+    function showStatus(type, message) {
+      const badge = document.getElementById('statusBadge');
+      badge.className = 'status-badge ' + type;
+      badge.textContent = message;
+      badge.style.display = 'inline-flex';
+    }
+  </script>
+</body>
+</html>

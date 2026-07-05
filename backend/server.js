@@ -3,21 +3,40 @@ const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const crypto = require('crypto');
 const os = require('os');
+const bcrypt = require('bcryptjs');
 const path = require('path');
-const rateLimit = require('express-rate-limit');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-// Serve frontend files from server
 app.use(express.static(path.join(__dirname, '../frontend')));
 
 const SECRET = 'sekuvo_secret_key_2024';
 const SECRET_MASTER = 'SEKUVO_MASTER_SECRET_2024';
 const ALLOWED_MACHINE = 'LAPTOP-2JQ20K53';
 
-// Rate limiting — 3 baar galat try pe 15 min block
+// Recovery code store (in memory — production mein database use karo)
+let recoveryCodeHash = null;
+let recoveryCodeUsed = false;
+
+// Recovery code generate karo — server start hone pe
+async function generateRecoveryCode() {
+  const code = crypto.randomBytes(12).toString('hex').toUpperCase();
+  const formatted = code.match(/.{1,6}/g).join('-'); // Format: XXXXXX-XXXXXX-XXXXXX-XXXXXX
+  recoveryCodeHash = await bcrypt.hash(formatted, 10);
+  recoveryCodeUsed = false;
+  console.log('=================================');
+  console.log('⚠️  MASTER RECOVERY CODE:');
+  console.log(formatted);
+  console.log('Save this code safely!');
+  console.log('=================================');
+  return formatted;
+}
+
+generateRecoveryCode();
+
+// USB verify
+const rateLimit = require('express-rate-limit');
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 3,
@@ -28,79 +47,77 @@ const authLimiter = rateLimit({
 app.post('/api/verify-key', authLimiter, (req, res) => {
   const { key, deviceId, machine, expiresAt } = req.body;
 
-  // 1. Machine check
   const currentMachine = os.hostname();
   if (currentMachine !== ALLOWED_MACHINE) {
-    return res.status(401).json({
-      success: false,
-      message: 'Unauthorized machine!'
-    });
+    return res.status(401).json({ success: false, message: 'Unauthorized machine!' });
   }
 
-  // 2. Expiry check
   const expiry = new Date(expiresAt);
   if (expiry < new Date()) {
-    return res.status(401).json({
-      success: false,
-      message: 'USB key has expired!'
-    });
+    return res.status(401).json({ success: false, message: 'USB key has expired!' });
   }
 
-  // 3. Key verify
   const expectedKey = crypto
     .createHmac('sha256', SECRET_MASTER)
     .update(machine + '_SEKUVO_ADMIN')
     .digest('hex');
 
   if (key !== expectedKey) {
-    return res.status(401).json({
-      success: false,
-      message: 'Invalid USB key!'
-    });
+    return res.status(401).json({ success: false, message: 'Invalid USB key!' });
   }
 
-  // 4. DeviceId check
   const expectedDeviceId = 'SEKUVO_' + machine.toUpperCase();
   if (deviceId !== expectedDeviceId) {
-    return res.status(401).json({
-      success: false,
-      message: 'Invalid device ID!'
-    });
+    return res.status(401).json({ success: false, message: 'Invalid device ID!' });
   }
 
-  // Token — 15 min valid
-  const token = jwt.sign(
-    { machine, deviceId },
-    SECRET,
-    { expiresIn: '15m' }
-  );
-
+  const token = jwt.sign({ machine, deviceId }, SECRET, { expiresIn: '15m' });
   res.json({ success: true, token, deviceName: deviceId });
 });
 
-// Protected admin routes
-app.get('/api/admin/stats', verifyToken, (req, res) => {
-  res.json({
-    users: 128,
-    sessions: 7,
-    alerts: 3,
-    deviceName: req.user.deviceId
+// Recovery code verify
+app.post('/api/verify-recovery', authLimiter, async (req, res) => {
+  const { code } = req.body;
+
+  if (!code) {
+    return res.status(400).json({ success: false, message: 'Recovery code required!' });
+  }
+
+  if (recoveryCodeUsed) {
+    return res.status(401).json({ success: false, message: 'Recovery code already used! Generate a new one.' });
+  }
+
+  const match = await bcrypt.compare(code.trim().toUpperCase(), recoveryCodeHash);
+
+  if (!match) {
+    return res.status(401).json({ success: false, message: 'Invalid recovery code!' });
+  }
+
+  // Code use ho gaya — expire karo
+  recoveryCodeUsed = true;
+
+  // Naya code generate karo
+  const newCode = await generateRecoveryCode();
+
+  const token = jwt.sign({ machine: 'RECOVERY', deviceId: 'RECOVERY_ACCESS' }, SECRET, { expiresIn: '15m' });
+
+  res.json({ 
+    success: true, 
+    token, 
+    deviceName: 'Recovery Access',
+    newCode: newCode,
+    message: 'Access granted! New recovery code generated — save it!'
   });
 });
 
-// Serve admin panel only with valid token
-app.get('/admin', verifyToken, (req, res) => {
-  res.sendFile(path.join(__dirname, '../frontend/admin.html'));
+// Admin stats
+app.get('/api/admin/stats', verifyToken, (req, res) => {
+  res.json({ users: 128, sessions: 7, alerts: 3, deviceName: req.user.deviceId });
 });
 
 function verifyToken(req, res, next) {
-  const token = req.headers['authorization']?.split(' ')[1] 
-    || req.query.token;
-    
-  if (!token) {
-    return res.status(403).json({ message: 'Token required!' });
-  }
-
+  const token = req.headers['authorization']?.split(' ')[1] || req.query.token;
+  if (!token) return res.status(403).json({ message: 'Token required!' });
   try {
     req.user = jwt.verify(token, SECRET);
     next();

@@ -12,8 +12,6 @@
       color: #fff;
       min-height: 100vh;
     }
-
-    /* Navbar */
     .navbar {
       display: flex;
       align-items: center;
@@ -55,13 +53,9 @@
       transition: all 0.2s;
     }
     .logout-btn:hover { background: #ff6b6b22; }
-
-    /* Main */
     .main { padding: 2rem; max-width: 1100px; margin: 0 auto; }
     .page-title { font-size: 24px; font-weight: 600; margin-bottom: 0.3rem; }
     .page-sub { font-size: 13px; color: #555; margin-bottom: 2rem; }
-
-    /* Stats */
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -79,8 +73,6 @@
     .stat-value.purple { color: #6c63ff; }
     .stat-value.green { color: #6bcb77; }
     .stat-value.red { color: #ff6b6b; }
-
-    /* Sections */
     .sections-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -100,8 +92,6 @@
       letter-spacing: 0.5px;
       margin-bottom: 1rem;
     }
-
-    /* Users */
     .user-row {
       display: flex;
       align-items: center;
@@ -122,8 +112,6 @@
     .user-role { font-size: 11px; color: #555; }
     .online { width: 7px; height: 7px; border-radius: 50%; background: #6bcb77; }
     .offline { width: 7px; height: 7px; border-radius: 50%; background: #333; }
-
-    /* Activity */
     .activity-row {
       display: flex;
       align-items: flex-start;
@@ -136,18 +124,59 @@
     .activity-icon { font-size: 16px; }
     .activity-text { flex: 1; color: #ccc; }
     .activity-time { font-size: 11px; color: #444; white-space: nowrap; }
+    .device-info { font-size: 12px; color: #444; margin-top: 0.3rem; }
 
-    .device-info {
-      font-size: 12px;
-      color: #444;
-      margin-top: 0.3rem;
+    /* Recovery Code Alert Box */
+    .recovery-alert {
+      background: #2a1a00;
+      border: 1px solid #ffd93d44;
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
+      display: none;
     }
+    .recovery-alert-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #ffd93d;
+      margin-bottom: 0.5rem;
+    }
+    .recovery-code-display {
+      font-size: 20px;
+      font-weight: 700;
+      color: #ffd93d;
+      letter-spacing: 3px;
+      margin: 0.5rem 0;
+    }
+    .recovery-alert-sub {
+      font-size: 12px;
+      color: #ff6b6b;
+      margin-top: 0.5rem;
+    }
+    .copy-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid #ffd93d44;
+      background: transparent;
+      color: #ffd93d;
+      font-size: 12px;
+      cursor: pointer;
+      margin-top: 0.75rem;
+      transition: all 0.2s;
+    }
+    .copy-btn:hover { background: #ffd93d22; }
   </style>
 </head>
 <body>
 
   <nav class="navbar">
-    <div class="logo">Seku<span>vo</span> <span style="font-size:14px;color:#444;font-weight:400;">Admin</span></div>
+   <div class="logo" style="display:flex;align-items:center;gap:10px;">
+  <img src="assets/sekuvo.png" alt="Sekuvo" style="width:36px;height:36px;object-fit:contain;border-radius:6px;">
+  <span>Seku<span style="color:#6c63ff;">vo</span> <span style="font-size:14px;color:#444;font-weight:400;">Admin</span></span>
+</div>
     <div class="nav-right">
       <div class="usb-badge">
         <div class="blink"></div>
@@ -158,6 +187,15 @@
   </nav>
 
   <main class="main">
+
+    <!-- Recovery Code Alert -->
+    <div class="recovery-alert" id="recoveryAlert">
+      <div class="recovery-alert-title">⚠️ New Recovery Code Generated — Save it now!</div>
+      <div class="recovery-code-display" id="recoveryCodeDisplay"></div>
+      <div class="recovery-alert-sub">This code will NOT be shown again. Store it in a safe place!</div>
+      <button class="copy-btn" onclick="copyCode()">📋 Copy Code</button>
+    </div>
+
     <div class="page-title">Dashboard</div>
     <p class="page-sub">Welcome back. Your session is secured via USB authentication.</p>
 
@@ -234,21 +272,32 @@
   </main>
 
   <script>
-   const token = sessionStorage.getItem('adminToken') || new URLSearchParams(window.location.search).get('token');
-const deviceName = sessionStorage.getItem('deviceName');
+    const token = sessionStorage.getItem('adminToken') || new URLSearchParams(window.location.search).get('token');
+    const deviceName = sessionStorage.getItem('deviceName');
 
-if (!token) window.location.href = 'http://localhost:3000';
+   if (!token) window.location.href = 'http://127.0.0.1:5500/frontend/index.html';
+    if (token) sessionStorage.setItem('adminToken', token);
 
-// Token sessionStorage mein save karo
-if (token) sessionStorage.setItem('adminToken', token);
+    // Recovery se aaya hai to new code dikhao — admin panel ke andar
+    const newCode = sessionStorage.getItem('newRecoveryCode');
+    if (newCode) {
+      document.getElementById('recoveryCodeDisplay').textContent = newCode;
+      document.getElementById('recoveryAlert').style.display = 'block';
+      sessionStorage.removeItem('newRecoveryCode');
+    }
 
-    // Device name show karo
+    function copyCode() {
+      const code = document.getElementById('recoveryCodeDisplay').textContent;
+      navigator.clipboard.writeText(code);
+      document.querySelector('.copy-btn').textContent = '✅ Copied!';
+      setTimeout(() => { document.querySelector('.copy-btn').textContent = '📋 Copy Code'; }, 2000);
+    }
+
     if (deviceName) {
       document.getElementById('usbDeviceName').textContent = deviceName;
       document.getElementById('deviceInfo').textContent = `Authenticated via: ${deviceName}`;
     }
 
-    // Stats load karo
     fetch('http://localhost:3000/api/admin/stats', {
       headers: { 'Authorization': `Bearer ${token}` }
     })
@@ -263,8 +312,8 @@ if (token) sessionStorage.setItem('adminToken', token);
     });
 
     function removeUSB() {
-      localStorage.removeItem('adminToken');
-      localStorage.removeItem('deviceName');
+      sessionStorage.removeItem('adminToken');
+      sessionStorage.removeItem('deviceName');
       window.location.href = 'index.html';
     }
   </script>
