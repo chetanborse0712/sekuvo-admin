@@ -11,9 +11,9 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../frontend')));
 
-const SECRET = 'sekuvo_secret_key_2024';
-const SECRET_MASTER = 'SEKUVO_MASTER_SECRET_2024';
-const ALLOWED_MACHINE = 'LAPTOP-2JQ20K53';
+const SECRET = process.env.SECRET || 'sekuvo_secret_key_2024';
+const SECRET_MASTER = process.env.SECRET_MASTER || 'SEKUVO_MASTER_SECRET_2024';
+const ALLOWED_MACHINE = process.env.ALLOWED_MACHINE || 'LAPTOP-2JQ20K53';
 
 // Recovery code store (in memory — production mein database use karo)
 let recoveryCodeHash = null;
