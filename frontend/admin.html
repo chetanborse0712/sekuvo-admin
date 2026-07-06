@@ -125,32 +125,6 @@
     .activity-text { flex: 1; color: #ccc; }
     .activity-time { font-size: 11px; color: #444; white-space: nowrap; }
     .device-info { font-size: 12px; color: #444; margin-top: 0.3rem; }
-    .recovery-alert {
-      background: #2a1a00;
-      border: 1px solid #ffd93d44;
-      border-radius: 12px;
-      padding: 1.25rem 1.5rem;
-      margin-bottom: 2rem;
-      display: none;
-    }
-    .recovery-alert-title { font-size: 14px; font-weight: 600; color: #ffd93d; margin-bottom: 0.5rem; }
-    .recovery-code-display { font-size: 20px; font-weight: 700; color: #ffd93d; letter-spacing: 3px; margin: 0.5rem 0; }
-    .recovery-alert-sub { font-size: 12px; color: #ff6b6b; margin-top: 0.5rem; }
-    .copy-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 14px;
-      border-radius: 6px;
-      border: 1px solid #ffd93d44;
-      background: transparent;
-      color: #ffd93d;
-      font-size: 12px;
-      cursor: pointer;
-      margin-top: 0.75rem;
-      transition: all 0.2s;
-    }
-    .copy-btn:hover { background: #ffd93d22; }
   </style>
 </head>
 <body>
@@ -170,13 +144,6 @@
   </nav>
 
   <main class="main">
-
-    <div class="recovery-alert" id="recoveryAlert">
-      <div class="recovery-alert-title">⚠️ New Recovery Code Generated — Save it now!</div>
-      <div class="recovery-code-display" id="recoveryCodeDisplay"></div>
-      <div class="recovery-alert-sub">This code will NOT be shown again. Store it in a safe place!</div>
-      <button class="copy-btn" onclick="copyCode()">📋 Copy Code</button>
-    </div>
 
     <div class="page-title">Dashboard</div>
     <p class="page-sub">Welcome back. Your session is secured via USB authentication.</p>
@@ -263,13 +230,6 @@
     if (token) sessionStorage.setItem('adminToken', token);
     if (deviceName) sessionStorage.setItem('deviceName', deviceName);
 
-    const newCode = sessionStorage.getItem('newRecoveryCode');
-    if (newCode) {
-      document.getElementById('recoveryCodeDisplay').textContent = newCode;
-      document.getElementById('recoveryAlert').style.display = 'block';
-      sessionStorage.removeItem('newRecoveryCode');
-    }
-
     if (deviceName) {
       document.getElementById('usbDeviceName').textContent = deviceName;
       document.getElementById('deviceInfo').textContent = `Authenticated via: ${deviceName}`;
@@ -292,13 +252,6 @@
       sessionStorage.removeItem('adminToken');
       sessionStorage.removeItem('deviceName');
       window.location.href = BASE + '/index.html';
-    }
-
-    function copyCode() {
-      const code = document.getElementById('recoveryCodeDisplay').textContent;
-      navigator.clipboard.writeText(code);
-      document.querySelector('.copy-btn').textContent = '✅ Copied!';
-      setTimeout(() => { document.querySelector('.copy-btn').textContent = '📋 Copy Code'; }, 2000);
     }
   </script>
 
