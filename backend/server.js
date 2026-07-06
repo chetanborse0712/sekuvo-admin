@@ -17,11 +17,22 @@ const SECRET = process.env.SECRET || 'sekuvo_secret_key_2024';
 const SECRET_MASTER = process.env.SECRET_MASTER || 'SEKUVO_MASTER_SECRET_2024';
 const ALLOWED_MACHINE = process.env.ALLOWED_MACHINE || 'LAPTOP-2JQ20K53';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const FIXED_RECOVERY_CODE = process.env.RECOVERY_CODE || null;
 
 let recoveryCodeHash = null;
 let recoveryCodeUsed = false;
 
 async function generateRecoveryCode() {
+  // Fixed code environment variable se
+  if (FIXED_RECOVERY_CODE && !recoveryCodeHash) {
+    recoveryCodeHash = await bcrypt.hash(FIXED_RECOVERY_CODE.toUpperCase(), 10);
+    recoveryCodeUsed = false;
+    console.log('=================================');
+    console.log('✅ Using fixed recovery code from environment');
+    console.log('=================================');
+    return FIXED_RECOVERY_CODE;
+  }
+
   const code = crypto.randomBytes(12).toString('hex').toUpperCase();
   const formatted = code.match(/.{1,6}/g).join('-');
   recoveryCodeHash = await bcrypt.hash(formatted, 10);
@@ -94,6 +105,9 @@ app.post('/api/verify-recovery', authLimiter, async (req, res) => {
   }
 
   recoveryCodeUsed = true;
+
+  // Naya code generate karo
+  recoveryCodeHash = null; // Reset karo taaki naya generate ho
   const newCode = await generateRecoveryCode();
 
   const token = jwt.sign({ machine: 'RECOVERY', deviceId: 'RECOVERY_ACCESS' }, SECRET, { expiresIn: '15m' });
@@ -102,8 +116,8 @@ app.post('/api/verify-recovery', authLimiter, async (req, res) => {
     success: true,
     token,
     deviceName: 'Recovery Access',
-    newCode: newCode,
-    message: 'Access granted! New recovery code generated — save it!'
+    newCode: FIXED_RECOVERY_CODE || newCode,
+    message: 'Access granted!'
   });
 });
 
