@@ -107,13 +107,13 @@
       🔓 Verify Recovery Code
     </button>
 
-    <a href="http://127.0.0.1:5500/frontend/index.html" class="back-btn">
+    <a href="https://sekuvo-admin.onrender.com/index.html" class="back-btn">
       ← Back to USB Login
     </a>
   </div>
 
   <script>
-    const SERVER = 'http://localhost:3000';
+    const SERVER = 'https://sekuvo-admin.onrender.com';
 
     async function verifyRecovery() {
       const code = document.getElementById('recoveryCode').value.trim();
@@ -137,15 +137,11 @@
         const data = await response.json();
 
         if (data.success) {
-          sessionStorage.setItem('adminToken', data.token);
-          sessionStorage.setItem('deviceName', data.deviceName);
-          // New code admin panel mein dikhega — not here!
           sessionStorage.setItem('newRecoveryCode', data.newCode);
-
           showStatus('success', 'Access Granted! Redirecting...');
 
           setTimeout(() => {
-            window.location.href = 'http://127.0.0.1:5500/frontend/admin.html';
+            window.location.href = `${SERVER}/admin.html?token=${data.token}&device=${encodeURIComponent(data.deviceName)}`;
           }, 1500);
 
         } else {
