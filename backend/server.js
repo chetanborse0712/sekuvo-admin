@@ -6,6 +6,8 @@ const os = require('os');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
+require('dotenv').config();
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -21,26 +23,56 @@ const FIXED_RECOVERY_CODE = process.env.RECOVERY_CODE
   ? process.env.RECOVERY_CODE.trim().toUpperCase() 
   : null;
 
-let recoveryCodeHash = null;
-let recoveryCodeUsed = false;
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+);
 
 async function initRecoveryCode() {
+  // Check karo Supabase mein already koi unused code hai ya nahi
+  const { data: existing, error: fetchError } = await supabase
+    .from('recovery_codes')
+    .select('*')
+    .eq('is_used', false)
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (fetchError) {
+    console.error('❌ Supabase fetch error:', fetchError.message);
+    return;
+  }
+
+  if (existing && existing.length > 0) {
+    console.log('✅ Existing unused recovery code found in Supabase, reusing it.');
+    return; // pehle se hai, naya banane ki zaroorat nahi
+  }
+
+  let formatted;
   if (FIXED_RECOVERY_CODE) {
-    recoveryCodeHash = await bcrypt.hash(FIXED_RECOVERY_CODE, 10);
-    recoveryCodeUsed = false;
+    formatted = FIXED_RECOVERY_CODE;
     console.log('=================================');
     console.log('✅ Fixed recovery code loaded');
     console.log('=================================');
   } else {
     const code = crypto.randomBytes(12).toString('hex').toUpperCase();
-    const formatted = code.match(/.{1,6}/g).join('-');
-    recoveryCodeHash = await bcrypt.hash(formatted, 10);
-    recoveryCodeUsed = false;
+    formatted = code.match(/.{1,6}/g).join('-');
     console.log('=================================');
     console.log('⚠️  MASTER RECOVERY CODE:');
     console.log(formatted);
     console.log('Save this code safely!');
     console.log('=================================');
+  }
+
+  const codeHash = await bcrypt.hash(formatted, 10);
+
+  const { error: insertError } = await supabase
+    .from('recovery_codes')
+    .insert([{ code_hash: codeHash, is_used: false }]);
+
+  if (insertError) {
+    console.error('❌ Supabase insert error:', insertError.message);
+  } else {
+    console.log('✅ Recovery code saved to Supabase');
   }
 }
 
@@ -93,22 +125,40 @@ app.post('/api/verify-recovery', authLimiter, async (req, res) => {
     return res.status(400).json({ success: false, message: 'Recovery code required!' });
   }
 
-  if (recoveryCodeUsed) {
+  const { data: rows, error } = await supabase
+    .from('recovery_codes')
+    .select('*')
+    .eq('is_used', false);
+
+  if (error) {
+    console.error('Supabase fetch error:', error.message);
+    return res.status(500).json({ success: false, message: 'Server error!' });
+  }
+
+  if (!rows || rows.length === 0) {
     return res.status(401).json({ success: false, message: 'Recovery code already used!' });
   }
 
-  if (!recoveryCodeHash) {
-    return res.status(500).json({ success: false, message: 'Recovery system not ready!' });
+  const inputCode = code.trim().toUpperCase();
+  let matchedRow = null;
+
+  for (const row of rows) {
+    const match = await bcrypt.compare(inputCode, row.code_hash);
+    if (match) {
+      matchedRow = row;
+      break;
+    }
   }
 
-  const inputCode = code.trim().toUpperCase();
-  const match = await bcrypt.compare(inputCode, recoveryCodeHash);
-
-  if (!match) {
+  if (!matchedRow) {
     return res.status(401).json({ success: false, message: 'Invalid recovery code!' });
   }
 
-  recoveryCodeUsed = true;
+  // Mark as used in Supabase
+  await supabase
+    .from('recovery_codes')
+    .update({ is_used: true })
+    .eq('id', matchedRow.id);
 
   const token = jwt.sign({ machine: 'RECOVERY', deviceId: 'RECOVERY_ACCESS' }, SECRET, { expiresIn: '15m' });
 
@@ -116,7 +166,6 @@ app.post('/api/verify-recovery', authLimiter, async (req, res) => {
     success: true,
     token,
     deviceName: 'Recovery Access',
-    newCode: FIXED_RECOVERY_CODE || 'Check server logs for new code',
     message: 'Access granted!'
   });
 });
