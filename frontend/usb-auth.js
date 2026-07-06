@@ -26,7 +26,7 @@ document.getElementById('usbBtn').onclick = async function() {
       sessionStorage.setItem('deviceName', data.deviceName);
       
       // Server se admin panel load karo
-      window.location.href = `http://127.0.0.1:5500/frontend/admin.html`;
+      window.location.href = `https://sekuvo-admin.onrender.com/admin.html`;
     } else {
       alert('Access Denied: ' + data.message);
     }
