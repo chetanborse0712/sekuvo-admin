@@ -125,8 +125,6 @@
     .activity-text { flex: 1; color: #ccc; }
     .activity-time { font-size: 11px; color: #444; white-space: nowrap; }
     .device-info { font-size: 12px; color: #444; margin-top: 0.3rem; }
-
-    /* Recovery Code Alert Box */
     .recovery-alert {
       background: #2a1a00;
       border: 1px solid #ffd93d44;
@@ -135,24 +133,9 @@
       margin-bottom: 2rem;
       display: none;
     }
-    .recovery-alert-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: #ffd93d;
-      margin-bottom: 0.5rem;
-    }
-    .recovery-code-display {
-      font-size: 20px;
-      font-weight: 700;
-      color: #ffd93d;
-      letter-spacing: 3px;
-      margin: 0.5rem 0;
-    }
-    .recovery-alert-sub {
-      font-size: 12px;
-      color: #ff6b6b;
-      margin-top: 0.5rem;
-    }
+    .recovery-alert-title { font-size: 14px; font-weight: 600; color: #ffd93d; margin-bottom: 0.5rem; }
+    .recovery-code-display { font-size: 20px; font-weight: 700; color: #ffd93d; letter-spacing: 3px; margin: 0.5rem 0; }
+    .recovery-alert-sub { font-size: 12px; color: #ff6b6b; margin-top: 0.5rem; }
     .copy-btn {
       display: inline-flex;
       align-items: center;
@@ -173,10 +156,10 @@
 <body>
 
   <nav class="navbar">
-   <div class="logo" style="display:flex;align-items:center;gap:10px;">
-  <img src="assets/sekuvo.png" alt="Sekuvo" style="width:36px;height:36px;object-fit:contain;border-radius:6px;">
-  <span>Seku<span style="color:#6c63ff;">vo</span> <span style="font-size:14px;color:#444;font-weight:400;">Admin</span></span>
-</div>
+    <div class="logo" style="display:flex;align-items:center;gap:10px;">
+      <img src="assets/sekuvo.png" alt="Sekuvo" style="width:36px;height:36px;object-fit:contain;border-radius:6px;">
+      <span>Seku<span style="color:#6c63ff;">vo</span> <span style="font-size:14px;color:#444;font-weight:400;">Admin</span></span>
+    </div>
     <div class="nav-right">
       <div class="usb-badge">
         <div class="blink"></div>
@@ -188,7 +171,6 @@
 
   <main class="main">
 
-    <!-- Recovery Code Alert -->
     <div class="recovery-alert" id="recoveryAlert">
       <div class="recovery-alert-title">⚠️ New Recovery Code Generated — Save it now!</div>
       <div class="recovery-code-display" id="recoveryCodeDisplay"></div>
@@ -272,13 +254,15 @@
   </main>
 
   <script>
-    const token = sessionStorage.getItem('adminToken') || new URLSearchParams(window.location.search).get('token');
-    const deviceName = sessionStorage.getItem('deviceName');
+    const BASE = 'https://sekuvo-admin.onrender.com';
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token') || sessionStorage.getItem('adminToken');
+    const deviceName = params.get('device') || sessionStorage.getItem('deviceName');
 
-   if (!token) window.location.href = 'http://127.0.0.1:5500/frontend/index.html';
+    if (!token) window.location.href = BASE + '/index.html';
     if (token) sessionStorage.setItem('adminToken', token);
+    if (deviceName) sessionStorage.setItem('deviceName', deviceName);
 
-    // Recovery se aaya hai to new code dikhao — admin panel ke andar
     const newCode = sessionStorage.getItem('newRecoveryCode');
     if (newCode) {
       document.getElementById('recoveryCodeDisplay').textContent = newCode;
@@ -286,19 +270,12 @@
       sessionStorage.removeItem('newRecoveryCode');
     }
 
-    function copyCode() {
-      const code = document.getElementById('recoveryCodeDisplay').textContent;
-      navigator.clipboard.writeText(code);
-      document.querySelector('.copy-btn').textContent = '✅ Copied!';
-      setTimeout(() => { document.querySelector('.copy-btn').textContent = '📋 Copy Code'; }, 2000);
-    }
-
     if (deviceName) {
       document.getElementById('usbDeviceName').textContent = deviceName;
       document.getElementById('deviceInfo').textContent = `Authenticated via: ${deviceName}`;
     }
 
-    fetch('http://localhost:3000/api/admin/stats', {
+    fetch(BASE + '/api/admin/stats', {
       headers: { 'Authorization': `Bearer ${token}` }
     })
     .then(res => res.json())
@@ -308,13 +285,20 @@
       document.getElementById('statAlerts').textContent = data.alerts;
     })
     .catch(() => {
-      window.location.href = 'index.html';
+      window.location.href = BASE + '/index.html';
     });
 
     function removeUSB() {
       sessionStorage.removeItem('adminToken');
       sessionStorage.removeItem('deviceName');
-      window.location.href = 'index.html';
+      window.location.href = BASE + '/index.html';
+    }
+
+    function copyCode() {
+      const code = document.getElementById('recoveryCodeDisplay').textContent;
+      navigator.clipboard.writeText(code);
+      document.querySelector('.copy-btn').textContent = '✅ Copied!';
+      setTimeout(() => { document.querySelector('.copy-btn').textContent = '📋 Copy Code'; }, 2000);
     }
   </script>
 
