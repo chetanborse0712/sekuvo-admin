@@ -17,35 +17,34 @@ const SECRET = process.env.SECRET || 'sekuvo_secret_key_2024';
 const SECRET_MASTER = process.env.SECRET_MASTER || 'SEKUVO_MASTER_SECRET_2024';
 const ALLOWED_MACHINE = process.env.ALLOWED_MACHINE || 'LAPTOP-2JQ20K53';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
-const FIXED_RECOVERY_CODE = process.env.RECOVERY_CODE || null;
+const FIXED_RECOVERY_CODE = process.env.RECOVERY_CODE 
+  ? process.env.RECOVERY_CODE.trim().toUpperCase() 
+  : null;
 
 let recoveryCodeHash = null;
 let recoveryCodeUsed = false;
 
-async function generateRecoveryCode() {
-  // Fixed code environment variable se
-  if (FIXED_RECOVERY_CODE && !recoveryCodeHash) {
-    recoveryCodeHash = await bcrypt.hash(FIXED_RECOVERY_CODE.toUpperCase(), 10);
+async function initRecoveryCode() {
+  if (FIXED_RECOVERY_CODE) {
+    recoveryCodeHash = await bcrypt.hash(FIXED_RECOVERY_CODE, 10);
     recoveryCodeUsed = false;
     console.log('=================================');
-    console.log('✅ Using fixed recovery code from environment');
+    console.log('✅ Fixed recovery code loaded');
     console.log('=================================');
-    return FIXED_RECOVERY_CODE;
+  } else {
+    const code = crypto.randomBytes(12).toString('hex').toUpperCase();
+    const formatted = code.match(/.{1,6}/g).join('-');
+    recoveryCodeHash = await bcrypt.hash(formatted, 10);
+    recoveryCodeUsed = false;
+    console.log('=================================');
+    console.log('⚠️  MASTER RECOVERY CODE:');
+    console.log(formatted);
+    console.log('Save this code safely!');
+    console.log('=================================');
   }
-
-  const code = crypto.randomBytes(12).toString('hex').toUpperCase();
-  const formatted = code.match(/.{1,6}/g).join('-');
-  recoveryCodeHash = await bcrypt.hash(formatted, 10);
-  recoveryCodeUsed = false;
-  console.log('=================================');
-  console.log('⚠️  MASTER RECOVERY CODE:');
-  console.log(formatted);
-  console.log('Save this code safely!');
-  console.log('=================================');
-  return formatted;
 }
 
-generateRecoveryCode();
+initRecoveryCode();
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -95,10 +94,15 @@ app.post('/api/verify-recovery', authLimiter, async (req, res) => {
   }
 
   if (recoveryCodeUsed) {
-    return res.status(401).json({ success: false, message: 'Recovery code already used! Generate a new one.' });
+    return res.status(401).json({ success: false, message: 'Recovery code already used!' });
   }
 
-  const match = await bcrypt.compare(code.trim().toUpperCase(), recoveryCodeHash);
+  if (!recoveryCodeHash) {
+    return res.status(500).json({ success: false, message: 'Recovery system not ready!' });
+  }
+
+  const inputCode = code.trim().toUpperCase();
+  const match = await bcrypt.compare(inputCode, recoveryCodeHash);
 
   if (!match) {
     return res.status(401).json({ success: false, message: 'Invalid recovery code!' });
@@ -106,17 +110,13 @@ app.post('/api/verify-recovery', authLimiter, async (req, res) => {
 
   recoveryCodeUsed = true;
 
-  // Naya code generate karo
-  recoveryCodeHash = null; // Reset karo taaki naya generate ho
-  const newCode = await generateRecoveryCode();
-
   const token = jwt.sign({ machine: 'RECOVERY', deviceId: 'RECOVERY_ACCESS' }, SECRET, { expiresIn: '15m' });
 
   res.json({
     success: true,
     token,
     deviceName: 'Recovery Access',
-    newCode: FIXED_RECOVERY_CODE || newCode,
+    newCode: FIXED_RECOVERY_CODE || 'Check server logs for new code',
     message: 'Access granted!'
   });
 });
