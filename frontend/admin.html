@@ -281,6 +281,7 @@
       try {
         // Step 1: Server se registration options (challenge) mangao
         const optionsRes = await fetch(BASE + '/api/webauthn/register-options', {
+          method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const options = await optionsRes.json();
