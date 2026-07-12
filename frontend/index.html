@@ -98,6 +98,41 @@
     }
     .usb-btn:hover { background: #6c63ff22; }
     .usb-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .webauthn-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 28px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      background: #6c63ff;
+      color: #fff;
+      transition: all 0.2s;
+      width: 100%;
+      justify-content: center;
+      margin-bottom: 0.75rem;
+    }
+    .webauthn-btn:hover { background: #5a52e0; }
+    .webauthn-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .or-divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 1rem 0;
+      color: #444;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .or-divider::before, .or-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #2a2a2a;
+    }
     .usb-info { font-size: 12px; color: #444; margin-top: 0.75rem; }
     .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
     .lost-usb {
@@ -128,12 +163,19 @@
       <span id="statusText">Access Locked</span>
     </div>
 
-    <p class="lock-title">USB Authentication Required</p>
-    <p class="lock-sub">Please insert your authenticated USB device<br>to access the admin portal.</p>
+    <p class="lock-title">Authentication Required</p>
+    <p class="lock-sub">Use your registered security key<br>to access the admin portal.</p>
 
     <div class="progress-wrap" id="progressWrap">
       <div class="progress-fill" id="progressFill"></div>
     </div>
+
+    <button class="webauthn-btn" id="webauthnBtn" onclick="loginWithSecurityKey()">
+      🔐 Login with Security Key
+    </button>
+    <p id="webauthnStatus" style="font-size: 12px; margin-bottom: 1rem; min-height: 16px;"></p>
+
+    <div class="or-divider">or use old method</div>
 
     <button class="usb-btn" id="usbBtn">
       🔑 Connect USB Device
@@ -147,6 +189,75 @@
 
   </div>
 
+  <script src="https://unpkg.com/@simplewebauthn/browser@13/dist/bundle/index.umd.min.js"></script>
   <script src="usb-auth.js"></script>
+  <script>
+    const WEBAUTHN_SERVER = 'https://sekuvo-admin.onrender.com';
+
+    async function loginWithSecurityKey() {
+      const btn = document.getElementById('webauthnBtn');
+      const statusEl = document.getElementById('webauthnStatus');
+
+      btn.disabled = true;
+      statusEl.style.color = '#888';
+      statusEl.textContent = 'Requesting challenge from server...';
+
+      try {
+        // Step 1: Server se login options (challenge) mangao
+        const optionsRes = await fetch(WEBAUTHN_SERVER + '/api/webauthn/login-options', {
+          method: 'POST'
+        });
+        const options = await optionsRes.json();
+
+        if (!optionsRes.ok) {
+          throw new Error(options.message || 'Failed to get login options');
+        }
+
+        statusEl.textContent = '🔑 Approve on your security key or phone now...';
+
+        // Step 2: Browser device se sign karwao
+        const authResp = await SimpleWebAuthnBrowser.startAuthentication({ optionsJSON: options });
+
+        statusEl.textContent = 'Verifying with server...';
+
+        // Step 3: Signed response server ko bhejo verify karne ke liye
+        const verifyRes = await fetch(WEBAUTHN_SERVER + '/api/webauthn/login-verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            credentialId: authResp.id,
+            response: authResp,
+            clientChallenge: options.challenge
+          })
+        });
+
+        const verifyData = await verifyRes.json();
+
+        if (verifyData.success) {
+          statusEl.style.color = '#6bcb77';
+          statusEl.textContent = '✅ Access granted! Redirecting...';
+
+          sessionStorage.setItem('adminToken', verifyData.token);
+          sessionStorage.setItem('deviceName', verifyData.deviceName);
+
+          setTimeout(() => {
+            window.location.href = `${WEBAUTHN_SERVER}/admin.html?token=${verifyData.token}&device=${encodeURIComponent(verifyData.deviceName)}`;
+          }, 1000);
+
+        } else {
+          throw new Error(verifyData.message || 'Login failed');
+        }
+
+      } catch (err) {
+        statusEl.style.color = '#ff6b6b';
+        if (err.name === 'NotAllowedError') {
+          statusEl.textContent = '❌ Cancelled or timed out.';
+        } else {
+          statusEl.textContent = '❌ ' + err.message;
+        }
+        btn.disabled = false;
+      }
+    }
+  </script>
 </body>
 </html>
