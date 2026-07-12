@@ -126,6 +126,7 @@
     .activity-time { font-size: 11px; color: #444; white-space: nowrap; }
     .device-info { font-size: 12px; color: #444; margin-top: 0.3rem; }
   </style>
+  <script src="https://unpkg.com/@simplewebauthn/browser@10/dist/bundle/index.umd.min.js"></script>
 </head>
 <body>
 
@@ -147,6 +148,20 @@
 
     <div class="page-title">Dashboard</div>
     <p class="page-sub">Welcome back. Your session is secured via USB authentication.</p>
+
+    <div class="section-card" style="margin-bottom: 2rem;">
+      <div class="section-title">🔐 Security Key Management</div>
+      <p style="font-size: 13px; color: #888; margin-bottom: 1rem;">
+        Register a new USB security key or your phone (via Bluetooth) as an authenticator. Once registered, you can log in using it instead of the old USB file method.
+      </p>
+      <input type="text" id="deviceNameInput" placeholder="Give this device a name (e.g. My Phone, YubiKey)"
+        style="width: 100%; padding: 10px 14px; background: #111; border: 1px solid #2a2a2a; border-radius: 8px; color: #fff; font-size: 13px; margin-bottom: 0.75rem; outline: none;">
+      <button id="registerKeyBtn" onclick="registerSecurityKey()"
+        style="padding: 10px 20px; border-radius: 8px; border: none; background: #6c63ff; color: #fff; font-size: 13px; font-weight: 500; cursor: pointer;">
+        ➕ Register New Security Key
+      </button>
+      <p id="registerStatus" style="font-size: 12px; margin-top: 0.75rem;"></p>
+    </div>
 
     <div class="stats-grid">
       <div class="stat-card">
@@ -252,6 +267,67 @@
       sessionStorage.removeItem('adminToken');
       sessionStorage.removeItem('deviceName');
       window.location.href = BASE + '/index.html';
+    }
+
+    async function registerSecurityKey() {
+      const statusEl = document.getElementById('registerStatus');
+      const btn = document.getElementById('registerKeyBtn');
+      const deviceName = document.getElementById('deviceNameInput').value.trim() || 'Unnamed Device';
+
+      statusEl.style.color = '#888';
+      statusEl.textContent = 'Requesting challenge from server...';
+      btn.disabled = true;
+
+      try {
+        // Step 1: Server se registration options (challenge) mangao
+        const optionsRes = await fetch(BASE + '/api/webauthn/register-options', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const options = await optionsRes.json();
+
+        if (!optionsRes.ok) {
+          throw new Error(options.message || 'Failed to get registration options');
+        }
+
+        statusEl.textContent = '📱 Touch/approve on your security key or phone now...';
+
+        // Step 2: Browser ke through device se sign karwao (ye USB/phone prompt dikhayega)
+        const attResp = await SimpleWebAuthnBrowser.startRegistration({ optionsJSON: options });
+
+        statusEl.textContent = 'Verifying with server...';
+
+        // Step 3: Signed response server ko wapas bhejo verify karne ke liye
+        const verifyRes = await fetch(BASE + '/api/webauthn/register-verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ ...attResp, deviceName })
+        });
+
+        const verifyData = await verifyRes.json();
+
+        if (verifyData.success) {
+          statusEl.style.color = '#6bcb77';
+          statusEl.textContent = '✅ Device registered successfully! You can now use it to log in.';
+          document.getElementById('deviceNameInput').value = '';
+        } else {
+          throw new Error(verifyData.message || 'Verification failed');
+        }
+
+      } catch (err) {
+        statusEl.style.color = '#ff6b6b';
+        if (err.name === 'InvalidStateError') {
+          statusEl.textContent = '⚠️ This device is already registered.';
+        } else if (err.name === 'NotAllowedError') {
+          statusEl.textContent = '❌ Registration cancelled or timed out.';
+        } else {
+          statusEl.textContent = '❌ Error: ' + err.message;
+        }
+      } finally {
+        btn.disabled = false;
+      }
     }
   </script>
 
