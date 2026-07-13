@@ -173,19 +173,13 @@
     <div class="section-card" style="margin-bottom: 2rem;">
       <div class="section-title">🆘 Emergency Recovery Code</div>
       <p style="font-size: 13px; color: #888; margin-bottom: 1rem;">
-        Generate a one-time emergency recovery code, in case you lose access to all your registered security keys. Generating a new code invalidates any previous one. The code is shown only once — save it somewhere safe immediately.
+        Generate a one-time emergency recovery code, in case you lose access to all your registered security keys. Generating a new code invalidates any previous one. The code is sent by email to registered addresses — it is never shown on screen.
       </p>
+      <div id="recoveryEmailsInfo" style="font-size: 12px; color: #555; margin-bottom: 0.75rem;">Loading registered emails...</div>
       <button id="generateRecoveryBtn" onclick="generateRecoveryCode()"
         style="padding: 10px 20px; border-radius: 8px; border: 1px solid #ffd93d44; background: transparent; color: #ffd93d; font-size: 13px; font-weight: 500; cursor: pointer;">
         🔄 Generate New Recovery Code
       </button>
-      <div id="recoveryCodeBox" style="display:none; margin-top: 1rem; padding: 1rem; background: #2a1a00; border: 1px solid #ffd93d44; border-radius: 8px;">
-        <div style="font-size: 12px; color: #ffd93d; margin-bottom: 0.5rem;">⚠️ Save this now — it will NOT be shown again:</div>
-        <div id="recoveryCodeText" style="font-size: 18px; font-weight: 700; color: #ffd93d; letter-spacing: 2px; word-break: break-all;"></div>
-        <button onclick="copyRecoveryCode()" style="margin-top: 0.75rem; padding: 6px 14px; border-radius: 6px; border: 1px solid #ffd93d44; background: transparent; color: #ffd93d; font-size: 12px; cursor: pointer;">
-          📋 Copy Code
-        </button>
-      </div>
       <p id="recoveryStatus" style="font-size: 12px; margin-top: 0.75rem;"></p>
     </div>
 
@@ -423,18 +417,37 @@
         btn.disabled = false;
       }
     }
+    async function loadRecoveryEmails() {
+      const infoEl = document.getElementById('recoveryEmailsInfo');
+      try {
+        const res = await fetch(BASE + '/api/recovery/emails', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+
+        if (data.success && data.emails.length > 0) {
+          infoEl.textContent = '📧 Will be sent to: ' + data.emails.join(', ');
+        } else {
+          infoEl.textContent = '⚠️ No recovery emails configured.';
+          infoEl.style.color = '#ff6b6b';
+        }
+      } catch (err) {
+        infoEl.textContent = 'Failed to load email info.';
+      }
+    }
+    loadRecoveryEmails();
+
     async function generateRecoveryCode() {
       const btn = document.getElementById('generateRecoveryBtn');
       const statusEl = document.getElementById('recoveryStatus');
-      const box = document.getElementById('recoveryCodeBox');
 
-      if (!confirm('This will invalidate any existing recovery code. Continue?')) {
+      if (!confirm('This will invalidate any existing recovery code and email a new one to registered addresses. Continue?')) {
         return;
       }
 
       btn.disabled = true;
       statusEl.style.color = '#888';
-      statusEl.textContent = 'Generating...';
+      statusEl.textContent = 'Generating and sending email...';
 
       try {
         const res = await fetch(BASE + '/api/recovery/generate', {
@@ -444,9 +457,8 @@
         const data = await res.json();
 
         if (data.success) {
-          document.getElementById('recoveryCodeText').textContent = data.code;
-          box.style.display = 'block';
-          statusEl.textContent = '';
+          statusEl.style.color = '#6bcb77';
+          statusEl.textContent = `✅ New recovery code sent to: ${data.sentTo.join(', ')}`;
         } else {
           throw new Error(data.message || 'Failed to generate code');
         }
@@ -456,13 +468,6 @@
       } finally {
         btn.disabled = false;
       }
-    }
-
-    function copyRecoveryCode() {
-      const code = document.getElementById('recoveryCodeText').textContent;
-      navigator.clipboard.writeText(code);
-      event.target.textContent = '✅ Copied!';
-      setTimeout(() => { event.target.textContent = '📋 Copy Code'; }, 2000);
     }
   </script>
 

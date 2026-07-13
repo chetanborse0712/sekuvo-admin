@@ -43,6 +43,32 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
+// ===== EMAIL CONFIG (Recovery Code delivery) =====
+const nodemailer = require('nodemailer');
+
+const RECOVERY_EMAILS = (process.env.RECOVERY_EMAILS || '')
+  .split(',')
+  .map(e => e.trim())
+  .filter(Boolean);
+
+const emailTransporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_APP_PASSWORD
+  }
+});
+
+// Email ko masked format mein dikhata hai — jaise ra***********2@gmail.com
+function maskEmail(email) {
+  const [local, domain] = email.split('@');
+  if (local.length <= 3) return local[0] + '***@' + domain;
+  const visibleStart = local.slice(0, 2);
+  const visibleEnd = local.slice(-1);
+  const masked = '*'.repeat(Math.max(local.length - 3, 3));
+  return `${visibleStart}${masked}${visibleEnd}@${domain}`;
+}
+
 // ===== WEBAUTHN CONFIG =====
 const {
   generateRegistrationOptions,
@@ -103,8 +129,12 @@ const authLimiter = rateLimit({
 });
 
 // Naya recovery code on-demand generate karta hai (protected — sirf logged-in admin).
-// Purane sabhi codes turant invalid ho jate hain. Naya code sirf EK BAAR response mein dikhta hai — save kar lena turant.
+// Purane sabhi codes turant invalid ho jate hain. Code response mein NAHI aata — seedha registered emails pe jata hai.
 app.post('/api/recovery/generate', verifyToken, async (req, res) => {
+  if (RECOVERY_EMAILS.length === 0) {
+    return res.status(500).json({ success: false, message: 'No recovery emails configured on server!' });
+  }
+
   try {
     // Purane sabhi recovery codes delete karo (invalidate)
     const { error: deleteError } = await supabase
@@ -130,12 +160,38 @@ app.post('/api/recovery/generate', verifyToken, async (req, res) => {
       return res.status(500).json({ success: false, message: 'Failed to generate recovery code!' });
     }
 
-    res.json({ success: true, code: formatted });
+    // Email bhejo sabhi registered partners ko
+    await emailTransporter.sendMail({
+      from: `"Sekuvo Admin Security" <${process.env.EMAIL_USER}>`,
+      to: RECOVERY_EMAILS.join(', '),
+      subject: '🔑 New Sekuvo Admin Recovery Code Generated',
+      html: `
+        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2 style="color: #6c63ff;">Sekuvo Admin — Emergency Recovery Code</h2>
+          <p>A new emergency recovery code has been generated for the Sekuvo Admin panel. Any previous code is now invalid.</p>
+          <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; font-size: 20px; font-weight: bold; letter-spacing: 2px; text-align: center; margin: 16px 0;">
+            ${formatted}
+          </div>
+          <p style="color: #888; font-size: 13px;">This code can be used only once. If you did not request this, please investigate immediately and revoke all security key access from the dashboard.</p>
+        </div>
+      `
+    });
+
+    res.json({ 
+      success: true, 
+      message: 'Recovery code generated and sent to registered emails.',
+      sentTo: RECOVERY_EMAILS.map(maskEmail)
+    });
 
   } catch (err) {
     console.error('Recovery generate error:', err.message);
-    res.status(500).json({ success: false, message: 'Server error!' });
+    res.status(500).json({ success: false, message: 'Server error: ' + err.message });
   }
+});
+
+// Masked recovery emails ki list dikhata hai (protected) — taaki UI mein confirm ho sake kahan bheja jayega
+app.get('/api/recovery/emails', verifyToken, (req, res) => {
+  res.json({ success: true, emails: RECOVERY_EMAILS.map(maskEmail) });
 });
 
 app.post('/api/verify-recovery', authLimiter, async (req, res) => {
