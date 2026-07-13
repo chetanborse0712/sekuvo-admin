@@ -52,11 +52,14 @@ const RECOVERY_EMAILS = (process.env.RECOVERY_EMAILS || '')
   .filter(Boolean);
 
 const emailTransporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false, // STARTTLS use hoga port 587 pe, more reliable on cloud platforms
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_APP_PASSWORD
-  }
+  },
+  connectionTimeout: 15000, // 15 second timeout — jaldi fail hoga agar dikkat ho, retry karne mein aasani
 });
 
 // Email ko masked format mein dikhata hai — jaise ra***********2@gmail.com
