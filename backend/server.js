@@ -60,6 +60,7 @@ const emailTransporter = nodemailer.createTransport({
     pass: process.env.EMAIL_APP_PASSWORD
   },
   connectionTimeout: 15000, // 15 second timeout — jaldi fail hoga agar dikkat ho, retry karne mein aasani
+  family: 4, // IPv4 force karo — Render ka network Gmail ke IPv6 tak nahi pahunch pa raha tha (ENETUNREACH)
 });
 
 // Email ko masked format mein dikhata hai — jaise ra***********2@gmail.com
