@@ -14,7 +14,9 @@ const { createClient } = require('@supabase/supabase-js');
 const REQUIRED_ENV_VARS = [
   'SECRET',
   'SUPABASE_URL',
-  'SUPABASE_SERVICE_KEY'
+  'SUPABASE_SERVICE_KEY',
+  'SENDGRID_API_KEY',
+  'EMAIL_USER'
 ];
 
 const missingVars = REQUIRED_ENV_VARS.filter(name => !process.env[name] || process.env[name].trim() === '');
@@ -44,41 +46,15 @@ const supabase = createClient(
 );
 
 // ===== EMAIL CONFIG (Recovery Code delivery) =====
-const nodemailer = require('nodemailer');
-const dns = require('dns');
-const { promisify } = require('util');
-const dnsLookup = promisify(dns.lookup);
+// SendGrid HTTPS API use karte hain — SMTP ports (587/465) Render pe blocked/unreachable the,
+// HTTPS (443) kabhi block nahi hota, isliye ye reliably kaam karega.
+const sgMail = require('@sendgrid/mail');
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 const RECOVERY_EMAILS = (process.env.RECOVERY_EMAILS || '')
   .split(',')
   .map(e => e.trim())
   .filter(Boolean);
-
-// Render ka network Gmail ke IPv6 address tak nahi pahunch pa raha (ENETUNREACH).
-// Isliye hum khud DNS lookup karke IPv4 address force karte hain, aur cache kar lete hain.
-let cachedTransporter = null;
-
-async function getEmailTransporter() {
-  if (cachedTransporter) return cachedTransporter;
-
-  const { address: ipv4Address } = await dnsLookup('smtp.gmail.com', { family: 4 });
-
-  cachedTransporter = nodemailer.createTransport({
-    host: ipv4Address, // resolved IPv4 IP, hostname nahi
-    port: 587,
-    secure: false,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_APP_PASSWORD
-    },
-    tls: {
-      servername: 'smtp.gmail.com' // zaroori hai TLS certificate validation ke liye, kyunki host ab IP hai
-    },
-    connectionTimeout: 15000,
-  });
-
-  return cachedTransporter;
-}
 
 // Email ko masked format mein dikhata hai — jaise ra***********2@gmail.com
 function maskEmail(email) {
@@ -181,11 +157,10 @@ app.post('/api/recovery/generate', verifyToken, async (req, res) => {
       return res.status(500).json({ success: false, message: 'Failed to generate recovery code!' });
     }
 
-    // Email bhejo sabhi registered partners ko
-    const transporter = await getEmailTransporter();
-    await transporter.sendMail({
-      from: `"Sekuvo Admin Security" <${process.env.EMAIL_USER}>`,
-      to: RECOVERY_EMAILS.join(', '),
+    // Email bhejo sabhi registered partners ko (SendGrid HTTPS API se)
+    await sgMail.send({
+      to: RECOVERY_EMAILS,
+      from: process.env.EMAIL_USER, // ye SendGrid mein verified sender hona chahiye
       subject: '🔑 New Sekuvo Admin Recovery Code Generated',
       html: `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
