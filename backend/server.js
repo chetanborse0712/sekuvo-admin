@@ -37,9 +37,6 @@ app.use(express.static(path.join(__dirname, '../frontend')));
 
 const SECRET = process.env.SECRET;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
-const FIXED_RECOVERY_CODE = process.env.RECOVERY_CODE 
-  ? process.env.RECOVERY_CODE.trim().toUpperCase() 
-  : null;
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -63,13 +60,14 @@ const ORIGIN = IS_PRODUCTION ? 'https://sekuvo-admin.onrender.com' : `http://loc
 // Challenges temporarily yahan store honge (in-memory) — ye short-lived hote hain (kuch minute), DB mein rakhne ki zaroorat nahi
 const pendingChallenges = new Map();
 
-async function initRecoveryCode() {
-  // Check karo Supabase mein already koi unused code hai ya nahi
+async function checkRecoveryCodeStatus() {
+  // Startup pe sirf inform karta hai — koi naya code khud se generate NAHI karta.
+  // Naya code sirf admin dashboard se manually generate hoga (on-demand), taaki
+  // "restart hote hi purana used code phir se active ho jaye" wala bug na ho.
   const { data: existing, error: fetchError } = await supabase
     .from('recovery_codes')
-    .select('*')
+    .select('id')
     .eq('is_used', false)
-    .order('created_at', { ascending: false })
     .limit(1);
 
   if (fetchError) {
@@ -78,40 +76,13 @@ async function initRecoveryCode() {
   }
 
   if (existing && existing.length > 0) {
-    console.log('✅ Existing unused recovery code found in Supabase, reusing it.');
-    return; // pehle se hai, naya banane ki zaroorat nahi
-  }
-
-  let formatted;
-  if (FIXED_RECOVERY_CODE) {
-    formatted = FIXED_RECOVERY_CODE;
-    console.log('=================================');
-    console.log('✅ Fixed recovery code loaded');
-    console.log('=================================');
+    console.log('✅ An active recovery code exists in Supabase.');
   } else {
-    const code = crypto.randomBytes(12).toString('hex').toUpperCase();
-    formatted = code.match(/.{1,6}/g).join('-');
-    console.log('=================================');
-    console.log('⚠️  MASTER RECOVERY CODE:');
-    console.log(formatted);
-    console.log('Save this code safely!');
-    console.log('=================================');
-  }
-
-  const codeHash = await bcrypt.hash(formatted, 10);
-
-  const { error: insertError } = await supabase
-    .from('recovery_codes')
-    .insert([{ code_hash: codeHash, is_used: false }]);
-
-  if (insertError) {
-    console.error('❌ Supabase insert error:', insertError.message);
-  } else {
-    console.log('✅ Recovery code saved to Supabase');
+    console.log('⚠️  No active recovery code exists. Generate one from the admin dashboard (Security Key Management → Generate Recovery Code) after logging in via WebAuthn.');
   }
 }
 
-initRecoveryCode();
+checkRecoveryCodeStatus();
 
 function verifyToken(req, res, next) {
   const token = req.headers['authorization']?.split(' ')[1] || req.query.token;
@@ -129,6 +100,42 @@ const authLimiter = rateLimit({
   max: 3,
   message: { success: false, message: 'Too many attempts! Try again after 15 minutes.' },
   skipSuccessfulRequests: true
+});
+
+// Naya recovery code on-demand generate karta hai (protected — sirf logged-in admin).
+// Purane sabhi codes turant invalid ho jate hain. Naya code sirf EK BAAR response mein dikhta hai — save kar lena turant.
+app.post('/api/recovery/generate', verifyToken, async (req, res) => {
+  try {
+    // Purane sabhi recovery codes delete karo (invalidate)
+    const { error: deleteError } = await supabase
+      .from('recovery_codes')
+      .delete()
+      .neq('id', 0); // sab rows match karega
+
+    if (deleteError) {
+      console.error('Supabase delete error:', deleteError.message);
+    }
+
+    // Naya random code generate karo
+    const code = crypto.randomBytes(15).toString('hex').toUpperCase();
+    const formatted = code.match(/.{1,6}/g).join('-');
+    const codeHash = await bcrypt.hash(formatted, 10);
+
+    const { error: insertError } = await supabase
+      .from('recovery_codes')
+      .insert([{ code_hash: codeHash, is_used: false }]);
+
+    if (insertError) {
+      console.error('Supabase insert error:', insertError.message);
+      return res.status(500).json({ success: false, message: 'Failed to generate recovery code!' });
+    }
+
+    res.json({ success: true, code: formatted });
+
+  } catch (err) {
+    console.error('Recovery generate error:', err.message);
+    res.status(500).json({ success: false, message: 'Server error!' });
+  }
 });
 
 app.post('/api/verify-recovery', authLimiter, async (req, res) => {
@@ -167,10 +174,10 @@ app.post('/api/verify-recovery', authLimiter, async (req, res) => {
     return res.status(401).json({ success: false, message: 'Invalid recovery code!' });
   }
 
-  // Mark as used in Supabase
+  // Delete karo Supabase se — truly single-use, dobara kabhi active nahi hoga
   await supabase
     .from('recovery_codes')
-    .update({ is_used: true })
+    .delete()
     .eq('id', matchedRow.id);
 
   const token = jwt.sign({ machine: 'RECOVERY', deviceId: 'RECOVERY_ACCESS' }, SECRET, { expiresIn: '15m' });
