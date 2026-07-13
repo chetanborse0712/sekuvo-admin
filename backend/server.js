@@ -2,7 +2,6 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const crypto = require('crypto');
-const os = require('os');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
@@ -14,7 +13,6 @@ const { createClient } = require('@supabase/supabase-js');
 // Isse silently weak/default secrets production mein use hone se bachte hain.
 const REQUIRED_ENV_VARS = [
   'SECRET',
-  'SECRET_MASTER',
   'SUPABASE_URL',
   'SUPABASE_SERVICE_KEY'
 ];
@@ -38,8 +36,6 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '../frontend')));
 
 const SECRET = process.env.SECRET;
-const SECRET_MASTER = process.env.SECRET_MASTER;
-const ALLOWED_MACHINE = process.env.ALLOWED_MACHINE || 'LAPTOP-2JQ20K53'; // ye local-dev-only check hai, production mein use hi nahi hota (niche dekho)
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const FIXED_RECOVERY_CODE = process.env.RECOVERY_CODE 
   ? process.env.RECOVERY_CODE.trim().toUpperCase() 
@@ -133,39 +129,6 @@ const authLimiter = rateLimit({
   max: 3,
   message: { success: false, message: 'Too many attempts! Try again after 15 minutes.' },
   skipSuccessfulRequests: true
-});
-
-app.post('/api/verify-key', authLimiter, (req, res) => {
-  const { key, deviceId, machine, expiresAt } = req.body;
-
-  if (!IS_PRODUCTION) {
-    const currentMachine = os.hostname();
-    if (currentMachine !== ALLOWED_MACHINE) {
-      return res.status(401).json({ success: false, message: 'Unauthorized machine!' });
-    }
-  }
-
-  const expiry = new Date(expiresAt);
-  if (expiry < new Date()) {
-    return res.status(401).json({ success: false, message: 'USB key has expired!' });
-  }
-
-  const expectedKey = crypto
-    .createHmac('sha256', SECRET_MASTER)
-    .update(machine + '_SEKUVO_ADMIN')
-    .digest('hex');
-
-  if (key !== expectedKey) {
-    return res.status(401).json({ success: false, message: 'Invalid USB key!' });
-  }
-
-  const expectedDeviceId = 'SEKUVO_' + machine.toUpperCase();
-  if (deviceId !== expectedDeviceId) {
-    return res.status(401).json({ success: false, message: 'Invalid device ID!' });
-  }
-
-  const token = jwt.sign({ machine, deviceId }, SECRET, { expiresIn: '15m' });
-  res.json({ success: true, token, deviceName: deviceId });
 });
 
 app.post('/api/verify-recovery', authLimiter, async (req, res) => {

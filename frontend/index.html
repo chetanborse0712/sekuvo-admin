@@ -80,24 +80,6 @@
       border-radius: 4px;
       transition: width 0.05s linear;
     }
-    .usb-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px 28px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      border: 1px solid #6c63ff;
-      background: transparent;
-      color: #6c63ff;
-      transition: all 0.2s;
-      width: 100%;
-      justify-content: center;
-    }
-    .usb-btn:hover { background: #6c63ff22; }
-    .usb-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .webauthn-btn {
       display: inline-flex;
       align-items: center;
@@ -117,23 +99,6 @@
     }
     .webauthn-btn:hover { background: #5a52e0; }
     .webauthn-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .or-divider {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin: 1rem 0;
-      color: #444;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    .or-divider::before, .or-divider::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: #2a2a2a;
-    }
-    .usb-info { font-size: 12px; color: #444; margin-top: 0.75rem; }
     .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
     .lost-usb {
       display: block;
@@ -156,7 +121,7 @@
 
     <div class="divider"></div>
 
-    <span class="usb-icon" id="usbIcon">🔌</span>
+    <span class="usb-icon" id="usbIcon">🔒</span>
 
     <div class="status-badge locked" id="statusBadge">
       <span class="dot"></span>
@@ -175,14 +140,6 @@
     </button>
     <p id="webauthnStatus" style="font-size: 12px; margin-bottom: 1rem; min-height: 16px;"></p>
 
-    <div class="or-divider">or use old method</div>
-
-    <button class="usb-btn" id="usbBtn">
-      🔑 Connect USB Device
-    </button>
-
-    <p class="usb-info" id="usbInfo">No USB device detected</p>
-
     <a href="recovery.html" class="lost-usb">
       🔑 Lost your USB? Emergency access
     </a>
@@ -190,7 +147,6 @@
   </div>
 
   <script src="https://unpkg.com/@simplewebauthn/browser@13/dist/bundle/index.umd.min.js"></script>
-  <script src="usb-auth.js"></script>
   <script>
     const WEBAUTHN_SERVER = 'https://sekuvo-admin.onrender.com';
 
