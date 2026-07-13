@@ -45,23 +45,40 @@ const supabase = createClient(
 
 // ===== EMAIL CONFIG (Recovery Code delivery) =====
 const nodemailer = require('nodemailer');
+const dns = require('dns');
+const { promisify } = require('util');
+const dnsLookup = promisify(dns.lookup);
 
 const RECOVERY_EMAILS = (process.env.RECOVERY_EMAILS || '')
   .split(',')
   .map(e => e.trim())
   .filter(Boolean);
 
-const emailTransporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false, // STARTTLS use hoga port 587 pe, more reliable on cloud platforms
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_APP_PASSWORD
-  },
-  connectionTimeout: 15000, // 15 second timeout — jaldi fail hoga agar dikkat ho, retry karne mein aasani
-  family: 4, // IPv4 force karo — Render ka network Gmail ke IPv6 tak nahi pahunch pa raha tha (ENETUNREACH)
-});
+// Render ka network Gmail ke IPv6 address tak nahi pahunch pa raha (ENETUNREACH).
+// Isliye hum khud DNS lookup karke IPv4 address force karte hain, aur cache kar lete hain.
+let cachedTransporter = null;
+
+async function getEmailTransporter() {
+  if (cachedTransporter) return cachedTransporter;
+
+  const { address: ipv4Address } = await dnsLookup('smtp.gmail.com', { family: 4 });
+
+  cachedTransporter = nodemailer.createTransport({
+    host: ipv4Address, // resolved IPv4 IP, hostname nahi
+    port: 587,
+    secure: false,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_APP_PASSWORD
+    },
+    tls: {
+      servername: 'smtp.gmail.com' // zaroori hai TLS certificate validation ke liye, kyunki host ab IP hai
+    },
+    connectionTimeout: 15000,
+  });
+
+  return cachedTransporter;
+}
 
 // Email ko masked format mein dikhata hai — jaise ra***********2@gmail.com
 function maskEmail(email) {
@@ -165,7 +182,8 @@ app.post('/api/recovery/generate', verifyToken, async (req, res) => {
     }
 
     // Email bhejo sabhi registered partners ko
-    await emailTransporter.sendMail({
+    const transporter = await getEmailTransporter();
+    await transporter.sendMail({
       from: `"Sekuvo Admin Security" <${process.env.EMAIL_USER}>`,
       to: RECOVERY_EMAILS.join(', '),
       subject: '🔑 New Sekuvo Admin Recovery Code Generated',
