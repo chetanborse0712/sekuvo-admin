@@ -161,6 +161,13 @@
         ➕ Register New Security Key
       </button>
       <p id="registerStatus" style="font-size: 12px; margin-top: 0.75rem;"></p>
+
+      <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #2a2a2a;">
+        <div class="section-title" style="margin-bottom: 0.75rem;">Registered Devices</div>
+        <div id="devicesList">
+          <p style="font-size: 13px; color: #555;">Loading...</p>
+        </div>
+      </div>
     </div>
 
     <div class="stats-grid">
@@ -269,6 +276,72 @@
       window.location.href = BASE + '/index.html';
     }
 
+    async function loadDevices() {
+      const listEl = document.getElementById('devicesList');
+
+      try {
+        const res = await fetch(BASE + '/api/webauthn/list-credentials', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+
+        if (!data.success || !data.devices || data.devices.length === 0) {
+          listEl.innerHTML = '<p style="font-size: 13px; color: #555;">No devices registered yet.</p>';
+          return;
+        }
+
+        listEl.innerHTML = data.devices.map(d => {
+          const created = new Date(d.created_at).toLocaleDateString();
+          const lastUsed = d.last_used_at ? new Date(d.last_used_at).toLocaleDateString() : 'Never';
+          return `
+            <div style="display:flex; align-items:center; justify-content:space-between; padding: 10px 0; border-bottom: 1px solid #222;">
+              <div>
+                <div style="font-size: 14px;">🔑 ${escapeHtml(d.device_name)}</div>
+                <div style="font-size: 11px; color: #555;">Registered: ${created} · Last used: ${lastUsed}</div>
+              </div>
+              <button onclick="removeDevice(${d.id}, '${escapeHtml(d.device_name)}')"
+                style="padding: 6px 14px; border-radius: 6px; border: 1px solid #ff6b6b44; background: transparent; color: #ff6b6b; font-size: 12px; cursor: pointer;">
+                🗑 Revoke
+              </button>
+            </div>
+          `;
+        }).join('');
+
+      } catch (err) {
+        listEl.innerHTML = '<p style="font-size: 13px; color: #ff6b6b;">Failed to load devices.</p>';
+      }
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    async function removeDevice(id, name) {
+      if (!confirm(`Are you sure you want to revoke access for "${name}"? This cannot be undone.`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(BASE + '/api/webauthn/remove-credential/' + id, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          loadDevices(); // list refresh karo
+        } else {
+          alert('Failed to revoke: ' + data.message);
+        }
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
+
+    loadDevices();
+
     async function registerSecurityKey() {
       const statusEl = document.getElementById('registerStatus');
       const btn = document.getElementById('registerKeyBtn');
@@ -313,6 +386,7 @@
           statusEl.style.color = '#6bcb77';
           statusEl.textContent = '✅ Device registered successfully! You can now use it to log in.';
           document.getElementById('deviceNameInput').value = '';
+          loadDevices(); // list turant refresh karo
         } else {
           throw new Error(verifyData.message || 'Verification failed');
         }

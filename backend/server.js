@@ -357,6 +357,39 @@ app.post('/api/webauthn/login-verify', authLimiter, async (req, res) => {
   }
 });
 
+// ===== WEBAUTHN: DEVICE MANAGEMENT (list + revoke) =====
+// Registered devices ki list dikhata hai (protected — sirf logged-in admin dekh sakta hai)
+app.get('/api/webauthn/list-credentials', verifyToken, async (req, res) => {
+  const { data, error } = await supabase
+    .from('webauthn_credentials')
+    .select('id, device_name, created_at, last_used_at')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Supabase fetch error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to fetch devices!' });
+  }
+
+  res.json({ success: true, devices: data });
+});
+
+// Kisi specific device ka access revoke/remove karta hai
+app.delete('/api/webauthn/remove-credential/:id', verifyToken, async (req, res) => {
+  const { id } = req.params;
+
+  const { error } = await supabase
+    .from('webauthn_credentials')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Supabase delete error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to remove device!' });
+  }
+
+  res.json({ success: true, message: 'Device access revoked successfully!' });
+});
+
 app.get('/api/admin/stats', verifyToken, (req, res) => {
   res.json({ users: 128, sessions: 7, alerts: 3, deviceName: req.user.deviceId });
 });
