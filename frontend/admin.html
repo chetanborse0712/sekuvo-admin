@@ -306,16 +306,19 @@
         listEl.innerHTML = data.devices.map(d => {
           const created = new Date(d.created_at).toLocaleDateString();
           const lastUsed = d.last_used_at ? new Date(d.last_used_at).toLocaleDateString() : 'Never';
+          const actionHtml = d.protected
+            ? `<span style="padding: 6px 14px; border-radius: 6px; border: 1px solid #6bcb7744; color: #6bcb77; font-size: 12px;">🛡️ Protected</span>`
+            : `<button onclick="removeDevice(${d.id}, '${escapeHtml(d.device_name)}')"
+                style="padding: 6px 14px; border-radius: 6px; border: 1px solid #ff6b6b44; background: transparent; color: #ff6b6b; font-size: 12px; cursor: pointer;">
+                🗑 Revoke
+              </button>`;
           return `
             <div style="display:flex; align-items:center; justify-content:space-between; padding: 10px 0; border-bottom: 1px solid #222;">
               <div>
                 <div style="font-size: 14px;">🔑 ${escapeHtml(d.device_name)}</div>
                 <div style="font-size: 11px; color: #555;">Registered: ${created} · Last used: ${lastUsed}</div>
               </div>
-              <button onclick="removeDevice(${d.id}, '${escapeHtml(d.device_name)}')"
-                style="padding: 6px 14px; border-radius: 6px; border: 1px solid #ff6b6b44; background: transparent; color: #ff6b6b; font-size: 12px; cursor: pointer;">
-                🗑 Revoke
-              </button>
+              ${actionHtml}
             </div>
           `;
         }).join('');

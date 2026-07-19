@@ -56,6 +56,8 @@ const RECOVERY_EMAILS = (process.env.RECOVERY_EMAILS || '')
   .map(e => e.trim())
   .filter(Boolean);
 
+const RECOVERY_CODE_EXPIRY_MINUTES = 15;
+
 // Email ko masked format mein dikhata hai — jaise ra***********2@gmail.com
 function maskEmail(email) {
   const [local, domain] = email.split('@');
@@ -169,7 +171,7 @@ app.post('/api/recovery/generate', verifyToken, async (req, res) => {
           <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; font-size: 20px; font-weight: bold; letter-spacing: 2px; text-align: center; margin: 16px 0;">
             ${formatted}
           </div>
-          <p style="color: #888; font-size: 13px;">This code can be used only once. If you did not request this, please investigate immediately and revoke all security key access from the dashboard.</p>
+          <p style="color: #888; font-size: 13px;">This code can be used only once, and is valid for ${RECOVERY_CODE_EXPIRY_MINUTES} minutes only. If you did not request this, please investigate immediately and revoke all security key access from the dashboard.</p>
         </div>
       `
     });
@@ -225,6 +227,16 @@ app.post('/api/verify-recovery', authLimiter, async (req, res) => {
 
   if (!matchedRow) {
     return res.status(401).json({ success: false, message: 'Invalid recovery code!' });
+  }
+
+  // Expiry check karo — code ka age nikaalo aur EXPIRY_MINUTES se compare karo
+  const codeAgeMs = Date.now() - new Date(matchedRow.created_at).getTime();
+  const codeAgeMinutes = codeAgeMs / (1000 * 60);
+
+  if (codeAgeMinutes > RECOVERY_CODE_EXPIRY_MINUTES) {
+    // Expired code ko turant delete karo — reuse na ho paye
+    await supabase.from('recovery_codes').delete().eq('id', matchedRow.id);
+    return res.status(401).json({ success: false, message: `Recovery code has expired! Codes are valid for only ${RECOVERY_CODE_EXPIRY_MINUTES} minutes after generation. Please generate a new one.` });
   }
 
   // Delete karo Supabase se — truly single-use, dobara kabhi active nahi hoga
@@ -418,24 +430,50 @@ app.post('/api/webauthn/login-verify', authLimiter, async (req, res) => {
 });
 
 // ===== WEBAUTHN: DEVICE MANAGEMENT (list + revoke) =====
+const CORE_ADMIN_COUNT = 3; // Pehle 3 registered devices "core admins" hain — inhe revoke nahi kiya ja sakta
+
 // Registered devices ki list dikhata hai (protected — sirf logged-in admin dekh sakta hai)
 app.get('/api/webauthn/list-credentials', verifyToken, async (req, res) => {
   const { data, error } = await supabase
     .from('webauthn_credentials')
     .select('id, device_name, created_at, last_used_at')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: true }); // ascending — sabse purana pehle, taaki rank sahi mile
 
   if (error) {
     console.error('Supabase fetch error:', error.message);
     return res.status(500).json({ success: false, message: 'Failed to fetch devices!' });
   }
 
-  res.json({ success: true, devices: data });
+  // Pehle CORE_ADMIN_COUNT devices ko "protected" mark karo
+  const devicesWithProtection = data.map((d, index) => ({
+    ...d,
+    protected: index < CORE_ADMIN_COUNT
+  }));
+
+  // Latest-first order mein wapas bhejo (UI mein naye upar dikhein)
+  res.json({ success: true, devices: devicesWithProtection.reverse() });
 });
 
 // Kisi specific device ka access revoke/remove karta hai
 app.delete('/api/webauthn/remove-credential/:id', verifyToken, async (req, res) => {
   const { id } = req.params;
+
+  // Pehle check karo ye device "core admin" (protected) toh nahi hai
+  const { data: allDevices, error: fetchError } = await supabase
+    .from('webauthn_credentials')
+    .select('id, created_at')
+    .order('created_at', { ascending: true });
+
+  if (fetchError) {
+    console.error('Supabase fetch error:', fetchError.message);
+    return res.status(500).json({ success: false, message: 'Failed to verify device!' });
+  }
+
+  const protectedIds = allDevices.slice(0, CORE_ADMIN_COUNT).map(d => d.id);
+
+  if (protectedIds.includes(Number(id))) {
+    return res.status(403).json({ success: false, message: 'This is a core admin device and cannot be revoked!' });
+  }
 
   const { error } = await supabase
     .from('webauthn_credentials')
