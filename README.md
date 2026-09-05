@@ -3,7 +3,7 @@
 A secure admin panel for Sekuvo — protected by USB authentication.
 
 ## Features
-🔑 Passkey Authentication (WebAuthn/FIDO2) — sign in using your phone's biometrics or a hardware security key instead of a password
+-🔑 Passkey Authentication (WebAuthn/FIDO2) — sign in using your phone's biometrics or a hardware security key instead of a password
   
 -📱 Multi-device support — register multiple authenticators (phone, security key) and manage them from the dashboard, each shown with a name and last-used date
 
