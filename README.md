@@ -37,10 +37,44 @@ WebAuthn standard.
 
 ## Tech Stack
 
-Node.js, Express.js, JavaScript, WebAuthn/FIDO2, JWT, Crypto, HTML, CSS
+- **Frontend**: HTML, CSS, JavaScript
+- **Backend**: Node.js, Express
+- **Auth**: WebAuthn (FIDO2) Passkeys + JWT
 
-## ⚠️ Note
-This was built as a learning project to understand passwordless authentication flows. Not intended for production use without a full security review.
-This was built as a learning project to understand passwordless
-authentication flows. Not intended for production use without a full
-security review.
+## Setup Instructions
+
+### 1. Clone the repository
+
+```
+git clone https://github.com/chetanborse0712/sekuvo-admin.git
+cd sekuvo-admin
+```
+
+### 2. Install dependencies
+
+```
+cd backend
+npm install
+```
+
+### 3. Configure environment variables
+
+Create a `.env` file in the `backend` folder with your own values (e.g.
+JWT secret, port, email service credentials for recovery codes). See
+`.env.example` if provided, or check `backend` source for required keys.
+
+### 4. Run the server
+
+```
+npm start
+```
+
+### 5. Register your first passkey
+
+Open the app in your browser, go to the admin dashboard, and click
+**"Register New Security Key"**. Follow the browser's native passkey
+prompt to register your phone or a hardware security key — no manual
+key file generation needed.
+
+> Note: The older USB-file-based key generation (`generateKey.js`) is
+> deprecated in favor of WebAuthn passkey registration.
