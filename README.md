@@ -3,12 +3,13 @@
 A secure admin panel for Sekuvo — protected by USB authentication.
 
 ## Features
-- 🔑 USB Key Authentication
-- 🔒 Machine Lock — runs only on authorized machine
-- ⏱️ 15 minute session timeout
-- 🚫 Rate limiting — 3 attempts then 15 min block
-- 🔐 Encrypted key verification
-- 📋 Activity Logs
+- 🔑 Passkey Authentication (WebAuthn/FIDO2) — sign in using your phone's biometrics or a hardware security key instead of a password
+-📱 Multi-device support — register multiple authenticators (phone, security key) and manage them from the dashboard, each shown with a name and last-used date
+-🔒 Machine Lock — sessions are bound to the authorized machine
+-⏱️ 15-minute session timeout — auto-expiring JWT-based sessions
+-🚫 Rate limiting — 3 failed attempts then a 15-minute block
+-🆘 Emergency recovery code — one-time-use recovery code emailed to registered addresses if all authenticators are lost (never shown on screen, invalidated on regeneration)
+-📋 Activity Logs — track registration and login activity per device
 
 ## Tech Stack
 - **Frontend:** HTML, CSS, JavaScript
